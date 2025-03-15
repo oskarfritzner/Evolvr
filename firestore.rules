@@ -37,7 +37,8 @@ service cloud.firestore {
     function isRoutineParticipant(routineData) {
       return isSignedIn() && (routineData.participants.hasAny([request.auth.uid]));
     }
-
+    
+    
     // Helper function to check if users are friends
     function areFriends(userId) {
       return isAuthenticated() && (
@@ -53,96 +54,58 @@ service cloud.firestore {
       allow read, update, delete: if isOwner(userId);
     }
 
-    // Users collection
-    match /users/{userId} {
-      // Allow user search for authenticated users
-      allow list: if isAuthenticated();
-      allow get: if true;
-      allow create: if isOwner(userId);
-      
-      // Main update rule
-      allow update: if isAuthenticated() && (
-        // Case 1: User is updating their own data
-        isOwner(userId) ||
-        
-        // Case 2: User data updates (including counters and profile)
-        (
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['unreadNotifications', 'friends', 'routines', 
-                     'lastActive', 'activeTasks', 'stats', 'habits', 'challenges',
-                     'lastRoutineSync', 'displayName', 'photoURL', 'username', 
-                     'bio', 'level', 'xp', 'badges', 'achievements', 'cachedData']) && 
-          (
-            isOwner(userId) ||
-            // Allow cache updates for any authenticated user viewing the profile
-            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cachedData']) &&
-             isAuthenticated())
-          )
-        ) ||
-        
-        // Case 3: Allow incrementing unreadNotifications when sending notifications
-        (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadNotifications']) &&
-          (
-            // For friend requests
-            exists(/databases/$(database)/documents/friendRequests/$(request.resource.data.id)) ||
-            // For other notifications
-            request.resource.data.unreadNotifications == resource.data.unreadNotifications + 1
-          )
-        )
-      );
-      
-      allow delete: if isOwner(userId);
+// Users collection
+match /users/{userId} {
+  // Allow user search for authenticated users
+  allow list: if isAuthenticated();
+  allow get: if true;
+  allow create: if isOwner(userId);
+  
+  // Main update rule
+  allow update: if isAuthenticated() && (
+    // Case 1: User updating their own data
+    (
+      isOwner(userId) &&
+      request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['unreadNotifications', 'friends', 'routines', 
+                 'lastActive', 'activeTasks', 'stats', 'habits', 'challenges',
+                 'lastRoutineSync', 'displayName', 'photoURL', 'username', 
+                 'bio', 'level', 'xp', 'badges', 'achievements', 'cachedData'])
+    ) ||
+    
+    // Case 2: Friend updates (simplified)
+    (
+      // Only allow friends array to be modified
+      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']) &&
+      // Ensure other fields remain unchanged
+      request.resource.data.diff(resource.data).unchangedKeys().hasAll(
+        resource.data.keys().removeAll(['friends'])
+      )
+    ) ||
+    
+    // Case 3: Cache updates
+    (
+      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cachedData']) &&
+      isAuthenticated()
+    )
+  );
+  
+  allow delete: if isOwner(userId);
 
-      // Notifications subcollection
-      match /notifications/{notificationId} {
-        allow read: if isOwner(userId);
-        
-        // Allow creation of notifications
-        allow create: if isAuthenticated() && (
-          // Self notifications (like achievements, level ups)
-          isOwner(userId) ||
-          
-          // Friend request notifications
-          (
-            request.resource.data.type == 'FRIEND_REQUEST' &&
-            request.resource.data.senderId == request.auth.uid &&
-            request.resource.data.userId == userId
-          ) ||
-          
-          // Routine notifications
-          (
-            request.resource.data.type in ['ROUTINE_INVITE', 'ROUTINE_UPDATED', 'ROUTINE_DELETED'] &&
-            (
-              // Creator can send routine notifications
-              exists(/databases/$(database)/documents/routines/$(request.resource.data.routineId)) &&
-              get(/databases/$(database)/documents/routines/$(request.resource.data.routineId)).data.createdBy == request.auth.uid
-            )
-          ) ||
-          
-          // Challenge notifications
-          (
-            request.resource.data.type == 'CHALLENGE_INVITE' &&
-            request.resource.data.inviterId == request.auth.uid
-          )
-        );
-        
-        // Allow updates (marking as read, responding to invites)
-        allow update: if isOwner(userId) && (
-          // Only allow updating specific fields
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['read', 'responded', 'respondedAt', 'status'])
-        );
-        
-        allow delete: if isOwner(userId);
-      }
+  // Notifications subcollection - simplify
+  match /notifications/{notificationId} {
+    allow read: if request.auth.uid == userId;
+    allow create: if isAuthenticated();
+    allow update: if request.auth.uid == userId;
+    allow delete: if request.auth.uid == userId;
+  }
 
-      // User's routines subcollection
-      match /routines/{routineId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-    }
-
+  // User's routines subcollection
+  match /routines/{routineId} {
+    allow read, write: if request.auth.uid == userId;
+  }
+}
+    
     // Routines collection
     match /routines/{routineId} {
       allow read: if isSignedIn() && 
@@ -218,23 +181,15 @@ service cloud.firestore {
 
     // Friend Requests collection
     match /friendRequests/{requestId} {
-      allow read: if isAuthenticated() && (
-        resource.data.senderId == request.auth.uid ||
-        resource.data.receiverId == request.auth.uid
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        request.resource.data.senderId == request.auth.uid ||
+        request.resource.data.receiverId == request.auth.uid
       );
-      
-      allow create: if isAuthenticated() && 
-        request.resource.data.senderId == request.auth.uid;
-      
       allow update: if isAuthenticated() && (
         resource.data.senderId == request.auth.uid ||
         resource.data.receiverId == request.auth.uid
-      ) && (
-        // Only allow updating status and timestamps
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'updatedAt', 'respondedAt'])
       );
-      
       allow delete: if isAuthenticated() && (
         resource.data.senderId == request.auth.uid ||
         resource.data.receiverId == request.auth.uid
