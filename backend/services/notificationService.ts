@@ -149,27 +149,18 @@ export const notificationService = {
 
   async createNotification(notification: Notification): Promise<string> {
     try {
-      const batch = writeBatch(db);
-
       // Create notification in subcollection
       const notificationRef = doc(
         collection(db, `users/${notification.userId}/notifications`)
       );
 
-      batch.set(notificationRef, {
+      await setDoc(notificationRef, {
         ...notification,
         id: notificationRef.id,
         createdAt: Timestamp.now(),
         read: false,
       });
 
-      // Update unread counter on user document
-      const userRef = doc(db, "users", notification.userId);
-      batch.update(userRef, {
-        unreadNotifications: increment(1),
-      });
-
-      await batch.commit();
       return notificationRef.id;
     } catch (error) {
       console.error("Error creating notification:", error);
@@ -197,18 +188,9 @@ export const notificationService = {
     const notificationsRef = collection(db, `users/${userId}/notifications`);
     const q = query(notificationsRef, where("read", "==", false));
 
-    return onSnapshot(q, async (snapshot) => {
-      const unreadCount = snapshot.docs.length;
-
-      // Update the user's unreadNotifications count
-      try {
-        const userRef = doc(db, "users", userId);
-        await updateDoc(userRef, {
-          unreadNotifications: unreadCount,
-        });
-      } catch (error) {
-        console.error("Error updating unread notifications count:", error);
-      }
+    return onSnapshot(q, (snapshot) => {
+      // Just return the count, let the UI handle updates
+      return snapshot.size;
     });
   },
 };

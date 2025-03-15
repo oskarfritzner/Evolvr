@@ -157,13 +157,14 @@ export const friendService = {
     receiverData: FriendData
   ): Promise<void> {
     try {
-      console.log("Starting friend request acceptance:", {
+      console.log("Starting acceptFriendRequest with:", {
         requestId,
         senderData,
         receiverData,
       });
 
       const requestRef = doc(db, "friendRequests", requestId);
+      console.log("Getting friend request document...");
       const requestDoc = await getDoc(requestRef);
       const request = requestDoc.data() as FriendRequest;
 
@@ -171,51 +172,64 @@ export const friendService = {
         throw new Error("Friend request not found");
       }
 
-      // Use batch write for atomicity
-      const batch = writeBatch(db);
+      console.log("Friend request found:", request);
 
-      // Add each user to the other's friends array
-      const userRef = doc(db, "users", request.receiverId);
-      const friendRef = doc(db, "users", request.senderId);
+      // Add each user to the other's friends array sequentially
+      console.log("Setting up document references...");
+      const receiverRef = doc(db, "users", request.receiverId);
+      const senderRef = doc(db, "users", request.senderId);
 
-      // Add sender to receiver's friends
-      batch.update(userRef, {
+      console.log("Getting current user documents to verify...");
+      const [receiverDoc, senderDoc] = await Promise.all([
+        getDoc(receiverRef),
+        getDoc(senderRef),
+      ]);
+
+      console.log("Current documents state:", {
+        receiverExists: receiverDoc.exists(),
+        senderExists: senderDoc.exists(),
+        receiverFriends: receiverDoc.data()?.friends || [],
+        senderFriends: senderDoc.data()?.friends || [],
+      });
+
+      // Update receiver first
+      console.log("Adding sender to receiver's friends array...");
+      await updateDoc(receiverRef, {
         friends: arrayUnion({
           userId: senderData.userId,
-          displayName: senderData.username || senderData.displayName,
+          displayName: senderData.displayName,
+          username: senderData.username,
           photoURL: senderData.photoURL,
         }),
+        id: requestId,
       });
 
-      // Add receiver to sender's friends
-      batch.update(friendRef, {
+      // Then update sender
+      console.log("Adding receiver to sender's friends array...");
+      await updateDoc(senderRef, {
         friends: arrayUnion({
           userId: receiverData.userId,
-          displayName: receiverData.username || receiverData.displayName,
+          displayName: receiverData.displayName,
+          username: receiverData.username,
           photoURL: receiverData.photoURL,
         }),
+        id: requestId,
       });
 
-      // Update the notification in the subcollection
-      const notificationRef = doc(
-        db,
-        `users/${request.receiverId}/notifications/${requestId}`
-      );
-      batch.update(notificationRef, {
-        status: "ACCEPTED",
-        read: true,
-        respondedAt: Timestamp.now(),
-        responded: true,
-      });
+      // Finally delete the friend request
+      console.log("Deleting friend request document...");
+      await deleteDoc(requestRef);
 
-      // Delete the friend request document
-      batch.delete(requestRef);
-
-      // Commit all changes
-      await batch.commit();
       console.log("Friend request accepted successfully");
     } catch (error) {
       console.error("Error accepting friend request:", error);
+      if (error instanceof Error) {
+        console.error("Error details:", {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+        });
+      }
       throw error;
     }
   },
