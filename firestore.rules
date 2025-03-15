@@ -1,0 +1,260 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isParticipant(participants) {
+      return participants.hasAny([request.auth.uid]);
+    }
+
+    function isInvited(invites) {
+      return invites.hasAny([request.auth.uid]);
+    }
+
+    function isCreator(createdBy) {
+      return createdBy == request.auth.uid;
+    }
+
+    function hasCompletedOnboarding() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isRoutineCreator(routineData) {
+      return isSignedIn() && routineData.createdBy == request.auth.uid;
+    }
+    
+    function isRoutineParticipant(routineData) {
+      return isSignedIn() && (routineData.participants.hasAny([request.auth.uid]));
+    }
+
+    // Helper function to check if users are friends
+    function areFriends(userId) {
+      return isAuthenticated() && (
+        // Check if the user exists in the friends array
+        get(/databases/$(database)/documents/users/$(userId)).data.friends.hasAny([request.auth.uid]) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.friends.hasAny([userId])
+      );
+    }
+
+    // Incomplete Users (for onboarding)
+    match /incompleteUsers/{userId} {
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow read, update, delete: if isOwner(userId);
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Allow user search for authenticated users
+      allow list: if isAuthenticated();
+      allow get: if true;
+      allow create: if isOwner(userId);
+      
+      // Main update rule
+      allow update: if isAuthenticated() && (
+        // Case 1: User is updating their own data
+        isOwner(userId) ||
+        
+        // Case 2: User data updates (including counters and profile)
+        (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['unreadNotifications', 'friends', 'routines', 
+                     'lastActive', 'activeTasks', 'stats', 'habits', 'challenges',
+                     'lastRoutineSync', 'displayName', 'photoURL', 'username', 
+                     'bio', 'level', 'xp', 'badges', 'achievements', 'cachedData']) && 
+          (
+            isOwner(userId) ||
+            // Allow cache updates for any authenticated user viewing the profile
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cachedData']) &&
+             isAuthenticated())
+          )
+        ) ||
+        
+        // Case 3: Allow incrementing unreadNotifications when sending notifications
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadNotifications']) &&
+          (
+            // For friend requests
+            exists(/databases/$(database)/documents/friendRequests/$(request.resource.data.id)) ||
+            // For other notifications
+            request.resource.data.unreadNotifications == resource.data.unreadNotifications + 1
+          )
+        )
+      );
+      
+      allow delete: if isOwner(userId);
+
+      // Notifications subcollection
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        
+        // Allow creation of notifications
+        allow create: if isAuthenticated() && (
+          // Self notifications (like achievements, level ups)
+          isOwner(userId) ||
+          
+          // Friend request notifications
+          (
+            request.resource.data.type == 'FRIEND_REQUEST' &&
+            request.resource.data.senderId == request.auth.uid &&
+            request.resource.data.userId == userId
+          ) ||
+          
+          // Routine notifications
+          (
+            request.resource.data.type in ['ROUTINE_INVITE', 'ROUTINE_UPDATED', 'ROUTINE_DELETED'] &&
+            (
+              // Creator can send routine notifications
+              exists(/databases/$(database)/documents/routines/$(request.resource.data.routineId)) &&
+              get(/databases/$(database)/documents/routines/$(request.resource.data.routineId)).data.createdBy == request.auth.uid
+            )
+          ) ||
+          
+          // Challenge notifications
+          (
+            request.resource.data.type == 'CHALLENGE_INVITE' &&
+            request.resource.data.inviterId == request.auth.uid
+          )
+        );
+        
+        // Allow updates (marking as read, responding to invites)
+        allow update: if isOwner(userId) && (
+          // Only allow updating specific fields
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['read', 'responded', 'respondedAt', 'status'])
+        );
+        
+        allow delete: if isOwner(userId);
+      }
+
+      // User's routines subcollection
+      match /routines/{routineId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+    }
+
+    // Routines collection
+    match /routines/{routineId} {
+      allow read: if isSignedIn() && 
+        (resource == null || isRoutineParticipant(resource.data));
+      
+      allow create: if isAuthenticated() && hasCompletedOnboarding() && (
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.keys().hasAll(['invites', 'participants', 'tasks', 'title', 'description']) &&
+        request.resource.data.invites is list &&
+        request.resource.data.participants is list &&
+        request.resource.data.tasks is list &&
+        request.resource.data.title is string &&
+        request.resource.data.description is string
+      );
+      
+      allow update: if isAuthenticated() && (
+        request.resource.data.createdBy == request.auth.uid ||
+        resource.data.participants.hasAny([request.auth.uid]) ||
+        resource.data.invites.hasAny([request.auth.uid])
+      );
+      
+      allow delete: if isRoutineCreator(resource.data);
+    }
+
+    // Tasks collection (for completions)
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && 
+        request.resource.data.createdBy == request.auth.uid;
+      
+      allow update: if isAuthenticated() && (
+        resource.data.createdBy == request.auth.uid ||
+        (resource.data.participants.hasAny([request.auth.uid]) &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['completions', 'lastUpdated']))
+      );
+      
+      allow delete: if isAuthenticated() && 
+        resource.data.createdBy == request.auth.uid;
+    }
+
+    // Posts collection
+    match /posts/{postId} {
+      allow read: if true;
+
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.keys().hasAll(['userId', 'username', 'createdAt', 'privacy']) &&
+        request.resource.data.privacy in ['public', 'friends', 'private'];
+
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == request.auth.uid;
+
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+
+    // Challenges collection
+    match /challenges/{challengeId} {
+      allow read: if isAuthenticated() && hasCompletedOnboarding();
+      allow create: if isAuthenticated() && hasCompletedOnboarding();
+      allow update: if isAuthenticated() && hasCompletedOnboarding() && (
+        isCreator(resource.data.createdBy) || 
+        isParticipant(resource.data.participants) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants']) &&
+         request.resource.data.participants.hasOnly(resource.data.participants.concat([request.auth.uid])))
+      );
+      allow delete: if isAuthenticated() && hasCompletedOnboarding() && 
+        isCreator(resource.data.createdBy);
+    }
+
+    // Friend Requests collection
+    match /friendRequests/{requestId} {
+      allow read: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.receiverId == request.auth.uid
+      );
+      
+      allow create: if isAuthenticated() && 
+        request.resource.data.senderId == request.auth.uid;
+      
+      allow update: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.receiverId == request.auth.uid
+      ) && (
+        // Only allow updating status and timestamps
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt', 'respondedAt'])
+      );
+      
+      allow delete: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.receiverId == request.auth.uid
+      );
+    }
+
+    // Habits collection
+    match /habits/{habitId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        isCreator(resource.data.createdBy) || 
+        isParticipant(resource.data.participants)
+      );
+      allow delete: if isAuthenticated() && isCreator(resource.data.createdBy);
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 
