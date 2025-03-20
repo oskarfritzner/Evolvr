@@ -1,0 +1,94 @@
+{
+  "expo": {
+    "name": "Evolvr",
+    "slug": "Evolvr",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "evolvr",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.oskarfritzner.Evolvr",
+      "associatedDomains": [
+        "applinks:evolvr.com"
+      ],
+      "config": {
+        "googleSignIn": {
+          "reservedClientId": "com.googleusercontent.apps.31085337846-scv1e3m6caggsc5bl5b2tsgcmuhfcnha"
+        }
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.oskarfritzner.Evolvr",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "evolvr",
+              "host": "*.evolvr.com",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them with your friends.",
+          "cameraPermission": "The app accesses your camera to let you share photos with your friends."
+        }
+      ],
+      [
+        "expo-auth-session",
+        {
+          "services": [
+            "google"
+          ]
+        }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.31085337846-scv1e3m6caggsc5bl5b2tsgcmuhfcnha"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "newArchEnabled": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b6ce49fa-114d-45f4-9224-e8e96e31d7c2"
+      }
+    }
+  }
+}
