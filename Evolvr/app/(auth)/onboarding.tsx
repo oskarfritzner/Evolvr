@@ -7,6 +7,8 @@ import {
   Alert,
   TouchableOpacity,
   Text,
+  ViewStyle,
+  TextStyle,
 } from "react-native"
 import { useTheme } from "@/context/ThemeContext"
 import { useAuth } from "@/context/AuthContext"
@@ -31,8 +33,14 @@ import { useRegistration } from '@/hooks/auth/useRegistration'
 import { userService } from '@/backend/services/userService'
 import { CategoryLevel } from "@/backend/types/Level"
 
-// Suppress findDOMNode warning
-LogBox.ignoreLogs(['findDOMNode']);
+// Suppress specific warnings for web
+if (Platform.OS === 'web') {
+  LogBox.ignoreLogs([
+    'Warning: Unsupported style property',
+    'TouchableWithoutFeedback is deprecated',
+    'props.pointerEvents is deprecated'
+  ]);
+}
 
 // Add type for the finalUserData
 interface FinalUserData {
@@ -338,14 +346,14 @@ export default function OnboardingScreen() {
     }
   };
 
-  return (
+  const content = (
     <View 
       style={[
-        styles.container, 
+        styles.container,
         { 
           backgroundColor: colors.background,
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
+          paddingTop: Platform.OS === 'web' ? 20 : insets.top,
+          paddingBottom: Platform.OS === 'web' ? 20 : insets.bottom,
         }
       ]}
     >
@@ -415,19 +423,34 @@ export default function OnboardingScreen() {
       <Toast />
     </View>
   );
+
+  if (Platform.OS === 'web') {
+    return (
+      <div style={{ 
+        maxWidth: 800, 
+        margin: '0 auto',
+        height: '100vh',
+        overflow: 'auto'
+      }}>
+        {content}
+      </div>
+    );
+  }
+
+  return content;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
+  } as ViewStyle,
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 10,
-  },
+  } as ViewStyle,
   cancelButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -435,11 +458,14 @@ const styles = StyleSheet.create({
     paddingRight: 16,
     borderRadius: 20,
     gap: 4,
-  },
+    ...(Platform.OS === 'web' ? {
+      cursor: 'pointer' as const,
+    } : {}),
+  } as ViewStyle,
   cancelText: {
     fontSize: 16,
     fontWeight: '500',
-  },
+  } as TextStyle,
   progressDots: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -447,29 +473,29 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     marginRight: 44,
-  },
+  } as ViewStyle,
   dot: {
     height: 8,
     borderRadius: 4,
-  },
+  } as ViewStyle,
   stepContainer: {
     flex: 1,
     width: '100%',
-  },
+  } as ViewStyle,
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     paddingHorizontal: 20,
     paddingBottom: Platform.OS === 'ios' ? 20 : 10,
     gap: 12,
-  },
+  } as ViewStyle,
   button: {
     flex: 1,
     minHeight: 50,
     borderRadius: 25,
-  },
+  } as ViewStyle,
   singleButton: {
     maxWidth: 200,
     alignSelf: 'center',
-  },
+  } as ViewStyle,
 }); 

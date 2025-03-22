@@ -47,6 +47,10 @@ const Post = memo(({ post: initialPost, onLike, onComment, onImagePress, current
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const commentSheetRef = useRef<BottomSheetModal>(null);
   const router = useRouter();
+  const [showFullImage, setShowFullImage] = useState(false);
+  const { width: screenWidth } = Dimensions.get('window');
+  const maxImageHeight = 500; // Maximum height for post images
+  const maxImageWidth = Math.min(screenWidth, 700); // Maximum width, capped at 700px or screen width
 
   // Theme-dependent styles
   const themedStyles = {
@@ -75,16 +79,18 @@ const Post = memo(({ post: initialPost, onLike, onComment, onImagePress, current
         post.imageURL,
         (width: number, height: number) => {
           const aspectRatio = width / height;
-          const calculatedHeight = imageWidth / aspectRatio;
-          setImageHeight(Math.min(calculatedHeight, width)); // Cap height at screen width
+          let calculatedHeight = maxImageWidth / aspectRatio;
+          // Cap height at maxImageHeight
+          calculatedHeight = Math.min(calculatedHeight, maxImageHeight);
+          setImageHeight(calculatedHeight);
         },
         (error: Error) => {
           console.error('Error getting image size:', error);
-          setImageHeight(width * 0.75); // Fallback to 4:3 ratio
+          setImageHeight(maxImageHeight); // Fallback height
         }
       );
     }
-  }, [post.imageURL, imageWidth]);
+  }, [post.imageURL, maxImageWidth]);
 
   // Create a simplified Friend object if likedByDetails is not available
   const getLikedByUsers = (): Friend[] => {
@@ -101,9 +107,7 @@ const Post = memo(({ post: initialPost, onLike, onComment, onImagePress, current
   };
 
   const handleImagePress = () => {
-    if (post.imageURL && onImagePress) {
-      onImagePress(post.imageURL);
-    }
+    setShowFullImage(true);
   };
 
   const handleLike = () => {
@@ -371,8 +375,12 @@ const Post = memo(({ post: initialPost, onLike, onComment, onImagePress, current
           <Image
             source={{ uri: post.imageURL }}
             style={[
-              styles.previewImage,
-              { opacity: imageLoading ? 0.7 : 1 }
+              styles.image,
+              {
+                width: maxImageWidth,
+                height: imageHeight,
+                opacity: imageLoading ? 0.7 : 1,
+              }
             ]}
             placeholder={blurhash}
             transition={300}
@@ -490,7 +498,7 @@ const Post = memo(({ post: initialPost, onLike, onComment, onImagePress, current
         {post.imageURL && (
           <TouchableOpacity
             onPress={handleImagePress}
-            activeOpacity={0.9}
+            activeOpacity={0.95}
             style={[styles.imageContainer, { backgroundColor: colors.background }]}
           >
             <Image
@@ -498,7 +506,7 @@ const Post = memo(({ post: initialPost, onLike, onComment, onImagePress, current
               style={[
                 styles.image,
                 {
-                  width: imageWidth,
+                  width: maxImageWidth,
                   height: imageHeight,
                   opacity: imageLoading ? 0.7 : 1,
                 }
@@ -584,7 +592,7 @@ const Post = memo(({ post: initialPost, onLike, onComment, onImagePress, current
 
       <BottomSheetModal
         ref={commentSheetRef}
-        snapPoints={['50%', '90%']}
+        snapPoints={['100%']}
         index={0}
         backgroundStyle={{ backgroundColor: colors.surface }}
         handleIndicatorStyle={{ backgroundColor: colors.border }}
@@ -592,8 +600,14 @@ const Post = memo(({ post: initialPost, onLike, onComment, onImagePress, current
         keyboardBlurBehavior="none"
         android_keyboardInputMode="adjustResize"
         enableDynamicSizing
+        style={{ flex: 1 }}
+        enablePanDownToClose
+        enableOverDrag={false}
       >
-        <View style={[styles.commentSheet, { paddingBottom: insets.bottom }]}>
+        <View style={[styles.commentSheet, { 
+          paddingBottom: insets.bottom,
+          flex: 1,
+        }]}>
           <Text style={[styles.commentSheetTitle, { color: colors.textPrimary }]}>
             {post.title || 'Comments'}
           </Text>
@@ -660,6 +674,33 @@ const Post = memo(({ post: initialPost, onLike, onComment, onImagePress, current
         onCancel={() => setShowDeleteConfirm(false)}
         confirmText="Delete"
       />
+
+      <Modal
+        visible={showFullImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFullImage(false)}
+      >
+        <TouchableOpacity
+          style={[styles.fullImageModal, { backgroundColor: 'rgba(0, 0, 0, 0.95)' }]}
+          activeOpacity={1}
+          onPress={() => setShowFullImage(false)}
+        >
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: colors.surface }]}
+            onPress={() => setShowFullImage(false)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <FontAwesome5 name="times" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Image
+            source={{ uri: post.imageURL }}
+            style={styles.fullImage}
+            contentFit="contain"
+            transition={200}
+          />
+        </TouchableOpacity>
+      </Modal>
     </>
   );
 });
@@ -697,11 +738,12 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
+    alignItems: 'center',
     marginVertical: 0,
     position: 'relative',
+    overflow: 'hidden',
   },
   image: {
-    width: '100%',
     borderRadius: 0,
   },
   imageLoadingContainer: {
@@ -751,6 +793,7 @@ const styles = StyleSheet.create({
   },
   commentsList: {
     paddingHorizontal: 16,
+    flexGrow: 1,
   },
   commentContainer: {
     flexDirection: 'row',
@@ -915,6 +958,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  fullImageModal: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImage: {
+    width: '100%',
+    height: '100%',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
 
