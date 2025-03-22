@@ -29,9 +29,18 @@ import { MaterialIcons } from '@expo/vector-icons'
 import { registrationService } from '@/backend/services/registrationService'
 import { useRegistration } from '@/hooks/auth/useRegistration'
 import { userService } from '@/backend/services/userService'
+import { CategoryLevel } from "@/backend/types/Level"
 
 // Suppress findDOMNode warning
 LogBox.ignoreLogs(['findDOMNode']);
+
+// Add type for the finalUserData
+interface FinalUserData {
+  email: string;
+  categories: Record<string, CategoryLevel>;
+  overall: { level: number; xp: number; prestige: number };
+  // ... other fields
+}
 
 export default function OnboardingScreen() {
   const { colors } = useTheme();
@@ -209,7 +218,15 @@ export default function OnboardingScreen() {
             goal,
             birthDate: profile.birthDate,
           },
-          categories: {},
+          categories: {
+            physical: { level: 1, xp: 0 },
+            mental: { level: 1, xp: 0 },
+            intellectual: { level: 1, xp: 0 },
+            spiritual: { level: 1, xp: 0 },
+            financial: { level: 1, xp: 0 },
+            career: { level: 1, xp: 0 },
+            relationships: { level: 1, xp: 0 },
+          },
           overall: { level: 1, xp: 0, prestige: 0 },
           stats: {
             totalTasksCompleted: 0,

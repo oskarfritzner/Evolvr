@@ -10,6 +10,12 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { incompleteUser } from "../types/User";
+import { categories } from "@/constants/categories";
+import { CategoryLevel, UserLevels } from "@/backend/types/Level";
+import { levelService } from "@/backend/services/levelService";
+
+// Verify categories are imported correctly
+console.log("Available categories:", categories);
 
 const COLLECTION = "incompleteUsers";
 
@@ -36,10 +42,20 @@ export const registrationService = {
 
   async completeRegistration(userId: string, userData: any): Promise<void> {
     try {
+      console.log("Starting registration completion for user:", userId);
+
+      // Get initial levels using levelService
+      const initialLevels: UserLevels = levelService.getInitialLevels();
+      console.log("Initial levels from levelService:", initialLevels);
+
       // Create the complete user document with all required fields
       const userRef = doc(db, "users", userId);
+
+      // Extract fields we don't want overridden
+      const { categories: userCategories, ...restUserData } = userData;
+
       const finalUserData = {
-        ...userData,
+        ...restUserData,
         userId,
         onboardingComplete: true,
         createdAt: new Date(),
@@ -47,6 +63,7 @@ export const registrationService = {
         displayName: userData.username || "",
         usernameLower: (userData.username || "").toLowerCase(),
         displayNameLower: (userData.username || "").toLowerCase(),
+        email: userData.email,
         friends: [],
         activeTasks: [],
         completedTasks: [],
@@ -59,9 +76,9 @@ export const registrationService = {
           status: "active",
           autoRenew: false,
         },
-        // Ensure all required fields are present
-        categories: userData.categories || {},
-        overall: userData.overall || { level: 1, xp: 0, prestige: 0 },
+        // Use the categories from levelService
+        categories: initialLevels.categories,
+        overall: initialLevels.overall,
         stats: {
           totalTasksCompleted: 0,
           currentStreak: 0,
@@ -74,12 +91,13 @@ export const registrationService = {
           todayCompletedTasks: [],
           ...userData.stats,
         },
-        // Initialize empty collections
         habits: {},
         Challenges: [],
         cachedRoutines: [],
         blockedUsers: [],
       };
+
+      console.log("Final user data categories:", finalUserData.categories);
 
       // First set the document
       await setDoc(userRef, finalUserData);
