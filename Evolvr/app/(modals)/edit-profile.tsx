@@ -14,7 +14,6 @@ export default function EditProfileModal() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [username, setUsername] = useState(user?.userData?.username || '');
   const [bio, setBio] = useState(user?.userData?.bio || '');
   const [photoURL, setPhotoURL] = useState(user?.userData?.photoURL || '');
 
@@ -56,7 +55,6 @@ export default function EditProfileModal() {
     setIsLoading(true);
     try {
       await userService.updateUserProfile(user.uid, {
-        username,
         bio,
         photoURL,
       });
@@ -117,25 +115,6 @@ export default function EditProfileModal() {
           </TouchableOpacity>
 
           <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Username</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.surface,
-                    color: colors.textPrimary,
-                    borderColor: colors.border,
-                  },
-                ]}
-                value={username}
-                onChangeText={setUsername}
-                placeholder="Enter username"
-                placeholderTextColor={colors.textSecondary}
-                autoCapitalize="none"
-              />
-            </View>
-
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>Bio</Text>
               <TextInput
