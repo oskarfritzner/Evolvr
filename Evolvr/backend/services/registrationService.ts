@@ -13,21 +13,71 @@ import { incompleteUser } from "../types/User";
 const COLLECTION = "incompleteUsers";
 
 export const registrationService = {
-  async create(userId: string, data: Partial<incompleteUser>) {
-    const incompleteUser: incompleteUser = {
-      email: data.email || "",
+  async create(
+    userId: string,
+    data: { email: string; authMethod: "email" | "google" }
+  ): Promise<void> {
+    const incompleteUserData: incompleteUser = {
+      email: data.email,
       userId,
       startedOnboarding: true,
       onboardingComplete: false,
-      createdAt: Timestamp.now().toDate(),
-      lastUpdated: Timestamp.now().toDate(),
-      authMethod: data.authMethod || "email",
+      createdAt: new Date(),
+      lastUpdated: new Date(),
+      authMethod: data.authMethod,
       onboardingStep: 1,
-      ...data,
     };
 
-    await setDoc(doc(db, COLLECTION, userId), incompleteUser);
-    return incompleteUser;
+    // Create incomplete user document
+    const userRef = doc(db, "incompleteUsers", userId);
+    await setDoc(userRef, incompleteUserData);
+  },
+
+  async completeRegistration(userId: string, userData: any): Promise<void> {
+    try {
+      // Create the complete user document
+      const userRef = doc(db, "users", userId);
+      await setDoc(userRef, {
+        ...userData,
+        onboardingComplete: true,
+        createdAt: new Date(),
+        lastUpdated: new Date(),
+      });
+
+      // Delete the incomplete user document
+      const incompleteUserRef = doc(db, "incompleteUsers", userId);
+      await deleteDoc(incompleteUserRef);
+    } catch (error) {
+      console.error("Error completing registration:", error);
+      throw error;
+    }
+  },
+
+  async deleteIncompleteUser(userId: string): Promise<void> {
+    try {
+      const incompleteUserRef = doc(db, "incompleteUsers", userId);
+      await deleteDoc(incompleteUserRef);
+    } catch (error) {
+      console.error("Error deleting incomplete user:", error);
+      throw error;
+    }
+  },
+
+  async updateOnboardingStep(userId: string, step: number): Promise<void> {
+    try {
+      const incompleteUserRef = doc(db, "incompleteUsers", userId);
+      await setDoc(
+        incompleteUserRef,
+        {
+          onboardingStep: step,
+          lastUpdated: new Date(),
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      console.error("Error updating onboarding step:", error);
+      throw error;
+    }
   },
 
   async update(userId: string, data: Partial<incompleteUser>) {
