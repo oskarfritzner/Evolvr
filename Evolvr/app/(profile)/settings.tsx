@@ -146,6 +146,11 @@ export default function Settings() {
         : theme.charAt(0).toUpperCase() + theme.slice(1),
     },
     {
+      title: 'Edit Profile',
+      icon: 'person',
+      onPress: () => router.push('/(modals)/edit-profile'),
+    },
+    {
       title: 'Notifications',
       icon: 'notifications',
       onPress: () => setShowNotificationModal(true),

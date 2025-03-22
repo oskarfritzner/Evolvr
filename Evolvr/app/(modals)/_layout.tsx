@@ -124,6 +124,21 @@ export default function ModalsLayout() {
           animation: 'slide_from_bottom',
         }}
       />
+      <Stack.Screen 
+        name="edit-profile"
+        options={{
+          headerShown: true,
+          title: 'Edit Profile',
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+          headerStyle: {
+            backgroundColor: colors.surface,
+          },
+          headerTintColor: colors.textPrimary,
+        }}
+      />
     </Stack>
+
+    
   );
 } 

@@ -3,7 +3,7 @@ import { useTheme } from "@/context/ThemeContext"
 import { StyleSheet } from 'react-native'
 import { useClientLayoutEffect } from '@/hooks/utils/useClientLayoutEffect';
 
-export default function SettingsLayout() {
+export default function ProfileLayout() {
   const { colors } = useTheme()
 
   useClientLayoutEffect(() => {
@@ -39,22 +39,10 @@ export default function SettingsLayout() {
       }}
     >
       <Stack.Screen 
-        name="index" 
-        options={{ 
-          headerShown: false
-        }} 
-      />
-      <Stack.Screen 
         name="[id]"
         options={{ 
           headerShown: false,
           headerTitle: '',
-        }} 
-      />
-      <Stack.Screen 
-        name="settings" 
-        options={{ 
-          headerTitle: 'Settings'
         }} 
       />
     </Stack>

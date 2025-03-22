@@ -13,11 +13,13 @@ import {
   deleteDoc,
   arrayRemove,
 } from "firebase/firestore";
-import { db, auth } from "../config/firebase";
+import { db, auth, storage } from "../config/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { UserData, UserStats, ProgressSnapshot } from "../types/UserData";
 import { FriendData } from "../types/Friend";
 import { postService } from "./postService";
 import logger from "@/utils/logger";
+import Toast from "react-native-toast-message";
 
 export const userService = {
   createUserData(data: Partial<UserData>) {
@@ -366,5 +368,56 @@ export const userService = {
         });
       }
     }
+  },
+
+  async uploadProfileImage(uri: string): Promise<string> {
+    if (!auth.currentUser?.uid) {
+      throw new Error("User must be authenticated to upload profile image");
+    }
+
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // Use the correct path structure: profileImages/{userId}/profile
+      const fileRef = ref(
+        storage,
+        `profileImages/${auth.currentUser.uid}/profile`
+      );
+
+      await uploadBytes(fileRef, blob);
+      const downloadURL = await getDownloadURL(fileRef);
+
+      // Update the user's photoURL in Firestore
+      const userRef = doc(db, "users", auth.currentUser.uid);
+      await updateDoc(userRef, {
+        photoURL: downloadURL,
+      });
+
+      return downloadURL;
+    } catch (error) {
+      console.error("Error uploading profile image:", error);
+      if (error instanceof Error) {
+        Toast.show({
+          type: "error",
+          text1: "Upload Failed",
+          text2: error.message,
+        });
+      }
+      throw error;
+    }
+  },
+
+  async updateUserProfile(
+    userId: string,
+    data: { username?: string; bio?: string; photoURL?: string }
+  ): Promise<void> {
+    const userRef = doc(db, "users", userId);
+    const updates: Partial<UserData> = {
+      ...data,
+      ...(data.username && { usernameLower: data.username.toLowerCase() }),
+    };
+    await updateDoc(userRef, updates);
+    await this.updateUserCache(userId);
   },
 };
