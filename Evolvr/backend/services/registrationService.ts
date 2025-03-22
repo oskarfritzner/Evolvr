@@ -7,6 +7,7 @@ import {
   updateDoc,
   deleteDoc,
   Timestamp,
+  getDocs,
 } from "firebase/firestore";
 import { incompleteUser } from "../types/User";
 
@@ -35,18 +36,73 @@ export const registrationService = {
 
   async completeRegistration(userId: string, userData: any): Promise<void> {
     try {
-      // Create the complete user document
+      // Create the complete user document with all required fields
       const userRef = doc(db, "users", userId);
-      await setDoc(userRef, {
+      const finalUserData = {
         ...userData,
+        userId,
         onboardingComplete: true,
         createdAt: new Date(),
         lastUpdated: new Date(),
-      });
+        displayName: userData.username || "",
+        usernameLower: (userData.username || "").toLowerCase(),
+        displayNameLower: (userData.username || "").toLowerCase(),
+        friends: [],
+        activeTasks: [],
+        completedTasks: [],
+        progress: [],
+        challenges: [],
+        posts: [],
+        subscription: {
+          type: "FREE",
+          startDate: new Date(),
+          status: "active",
+          autoRenew: false,
+        },
+        // Ensure all required fields are present
+        categories: userData.categories || {},
+        overall: userData.overall || { level: 1, xp: 0, prestige: 0 },
+        stats: {
+          totalTasksCompleted: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          routinesCompleted: 0,
+          habitsCompleted: [],
+          challengesCompleted: [],
+          totalChallengesJoined: 0,
+          todayXP: 0,
+          todayCompletedTasks: [],
+          ...userData.stats,
+        },
+        // Initialize empty collections
+        habits: {},
+        Challenges: [],
+        cachedRoutines: [],
+        blockedUsers: [],
+      };
+
+      // First set the document
+      await setDoc(userRef, finalUserData);
+
+      // Verify the document was created
+      const verifyDoc = await getDoc(userRef);
+      if (!verifyDoc.exists()) {
+        throw new Error("User document was not created successfully");
+      }
 
       // Delete the incomplete user document
       const incompleteUserRef = doc(db, "incompleteUsers", userId);
       await deleteDoc(incompleteUserRef);
+
+      // Double check the incomplete user was deleted
+      const verifyIncomplete = await getDoc(incompleteUserRef);
+      if (verifyIncomplete.exists()) {
+        console.warn(
+          "Incomplete user document still exists after deletion attempt"
+        );
+        // Try one more time
+        await deleteDoc(incompleteUserRef);
+      }
     } catch (error) {
       console.error("Error completing registration:", error);
       throw error;
@@ -55,11 +111,42 @@ export const registrationService = {
 
   async deleteIncompleteUser(userId: string): Promise<void> {
     try {
+      // First check if the document exists
       const incompleteUserRef = doc(db, "incompleteUsers", userId);
-      await deleteDoc(incompleteUserRef);
-    } catch (error) {
-      console.error("Error deleting incomplete user:", error);
-      throw error;
+      const docSnap = await getDoc(incompleteUserRef);
+
+      if (docSnap.exists()) {
+        await deleteDoc(incompleteUserRef);
+      } else {
+        console.log("No incomplete user document found to delete");
+      }
+
+      // Also check and delete from users collection just in case
+      const userRef = doc(db, "users", userId);
+      const userDocSnap = await getDoc(userRef);
+
+      if (userDocSnap.exists()) {
+        await deleteDoc(userRef);
+      }
+
+      // Clean up any related data
+      try {
+        // Delete from notifications subcollection if it exists
+        const notificationsRef = collection(
+          db,
+          `users/${userId}/notifications`
+        );
+        const notificationsSnapshot = await getDocs(notificationsRef);
+        const deletePromises = notificationsSnapshot.docs.map((doc) =>
+          deleteDoc(doc.ref)
+        );
+        await Promise.all(deletePromises);
+      } catch (error) {
+        console.error("Error cleaning up notifications:", error);
+      }
+    } catch (error: any) {
+      console.error("Error in deleteIncompleteUser:", error);
+      throw new Error(`Failed to delete user data: ${error.message}`);
     }
   },
 
