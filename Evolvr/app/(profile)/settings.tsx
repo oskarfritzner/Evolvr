@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '@/backend/config/firebase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Import theme styles and themes from ThemeContext
 const themeStyles = ['light', 'dark', 'system'] as const;
@@ -31,22 +32,24 @@ export default function Settings() {
   const [password, setPassword] = useState('');
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [themeAnimation] = useState(new Animated.Value(0));
-  const [themeButtonLayout, setThemeButtonLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const insets = useSafeAreaInsets();
 
   const toggleThemeSelector = (forceClose = false) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const toValue = forceClose ? 0 : !showThemeSelector ? 1 : 0;
+    if (!forceClose && !showThemeSelector) {
+      setShowThemeSelector(true);
+    }
     
     Animated.spring(themeAnimation, {
-      toValue,
+      toValue: forceClose ? 0 : 1,
       useNativeDriver: true,
-      tension: 80,
-      friction: 10,
+      tension: 120,
+      friction: 14,
+      velocity: 8,
+      restSpeedThreshold: 100,
+      restDisplacementThreshold: 40,
     }).start(() => {
-      if (forceClose || showThemeSelector) {
+      if (forceClose) {
         setShowThemeSelector(false);
-      } else {
-        setShowThemeSelector(true);
       }
     });
   };
@@ -129,12 +132,7 @@ export default function Settings() {
     setShowConfirmModal(true);
   }
 
-  const measureThemeButton = (event: any) => {
-    const { x, y, width, height } = event.nativeEvent.layout;
-    setThemeButtonLayout({ x, y, width, height });
-  };
-
-  const handleThemePress = (event: GestureResponderEvent) => {
+  const handleThemePress = () => {
     toggleThemeSelector();
   };
 
@@ -146,7 +144,6 @@ export default function Settings() {
       value: theme === 'system' 
         ? `System (${systemTheme.charAt(0).toUpperCase() + systemTheme.slice(1)})` 
         : theme.charAt(0).toUpperCase() + theme.slice(1),
-      onLayout: measureThemeButton,
     },
     {
       title: 'Notifications',
@@ -232,7 +229,6 @@ export default function Settings() {
               {settingItems.map((item, index) => (
                 <View key={item.title}>
                   <RNTouchableOpacity
-                    onLayout={item.onLayout}
                     style={[
                       styles.settingItem,
                       { borderBottomColor: index < settingItems.length - 1 ? colors.border : 'transparent' }
@@ -444,15 +440,16 @@ export default function Settings() {
           </View>
         </Modal>
 
-        {/* Add Modal for Theme Selector */}
+        {/* Theme Selector Modal */}
         <Modal
           visible={showThemeSelector}
           transparent
+          statusBarTranslucent
           animationType="none"
           onRequestClose={() => toggleThemeSelector(true)}
         >
           <RNTouchableOpacity 
-            style={styles.modalOverlay} 
+            style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.3)' }]} 
             activeOpacity={1}
             onPress={() => toggleThemeSelector(true)}
           >
@@ -461,35 +458,46 @@ export default function Settings() {
                 styles.themeSelector,
                 {
                   position: 'absolute',
-                  top: themeButtonLayout.y + themeButtonLayout.height + 8,
-                  left: 16,
-                  right: 16,
+                  bottom: insets.bottom,
+                  left: 0,
+                  right: 0,
                   backgroundColor: colors.surface,
                   opacity: themeAnimation,
                   transform: [{
                     translateY: themeAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [-10, 0],
+                      outputRange: [200, 0],
                     }),
                   }],
+                  borderTopLeftRadius: 20,
+                  borderTopRightRadius: 20,
                   shadowColor: "#000",
                   shadowOffset: {
                     width: 0,
-                    height: 2,
+                    height: -2,
                   },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 3.84,
-                  elevation: 5,
+                  shadowOpacity: 0.15,
+                  shadowRadius: 12,
+                  elevation: 25,
                 },
               ]}
             >
+              <View style={styles.themeHeader}>
+                <Text style={[styles.themeTitle, { color: colors.textPrimary, fontSize: 18, fontWeight: '600' }]}>
+                  Select Theme
+                </Text>
+                <View style={styles.themeDivider} />
+              </View>
               {themeStyles.map((themeName) => (
                 <RNTouchableOpacity
                   key={themeName}
                   style={[
                     styles.themeOption,
                     { 
-                      backgroundColor: theme === themeName ? colors.secondary + '20' : 'transparent',
+                      backgroundColor: theme === themeName ? colors.secondary + '15' : 'transparent',
+                      borderRadius: 12,
+                      margin: 8,
+                      marginHorizontal: 16,
                     },
                   ]}
                   onPress={() => {
@@ -498,10 +506,15 @@ export default function Settings() {
                   }}
                 >
                   <View style={styles.themeContent}>
-                    <View style={[styles.themeIconContainer, { backgroundColor: 'rgba(0,0,0,0.05)' }]}>
+                    <View style={[styles.themeIconContainer, { 
+                      backgroundColor: theme === themeName ? colors.secondary + '20' : 'rgba(0,0,0,0.05)',
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                    }]}>
                       <Ionicons
                         name={getThemeIcon(themeName)}
-                        size={20}
+                        size={22}
                         color={theme === themeName ? colors.secondary : colors.textPrimary}
                       />
                     </View>
@@ -524,13 +537,14 @@ export default function Settings() {
                   {theme === themeName && (
                     <Ionicons
                       name="checkmark"
-                      size={20}
+                      size={22}
                       color={colors.secondary}
                       style={styles.checkmark}
                     />
                   )}
                 </RNTouchableOpacity>
               ))}
+              <View style={{ height: 16 }} />
             </Animated.View>
           </RNTouchableOpacity>
         </Modal>
@@ -713,5 +727,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 8,
+  },
+  themeHeader: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  themeDivider: {
+    position: 'absolute',
+    top: 8,
+    left: '50%',
+    width: 40,
+    height: 4,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 2,
+    transform: [{ translateX: -20 }],
   },
 });
