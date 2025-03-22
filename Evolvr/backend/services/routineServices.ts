@@ -589,13 +589,25 @@ export const routineService = {
       const routineTasks: RoutineTaskWithMeta[] = [];
 
       for (const routine of routines) {
+        if (!routine?.id || !routine.title) {
+          console.warn("Invalid routine found:", routine);
+          continue;
+        }
+
         const tasksArray = (
           Array.isArray(routine.tasks)
             ? routine.tasks
             : Object.values(routine.tasks || {})
-        ) as RoutineTask[];
+        ).filter((task: any): task is RoutineTask => {
+          if (!task?.id || !task.title) {
+            console.warn("Invalid task found in routine:", routine.id, task);
+            return false;
+          }
+          return true;
+        });
 
         for (const task of tasksArray) {
+          // Skip inactive tasks
           if (task.active === false) continue;
 
           const today = new Date().toISOString().split("T")[0];
@@ -606,60 +618,98 @@ export const routineService = {
             })
           );
 
+          // Ensure participants array exists
+          const participants = routine.participants || [];
+
           // Get user's completion status
           const userHasCompleted = todayCompletions.some(
             (completion) => completion.completedBy === userId
           );
 
           // Check if all participants have completed
-          const allCompleted = routine.participants.every((participantId) =>
-            todayCompletions.some(
-              (completion) => completion.completedBy === participantId
-            )
-          );
+          const allCompleted =
+            participants.length > 0 &&
+            participants.every((participantId) =>
+              todayCompletions.some(
+                (completion) => completion.completedBy === participantId
+              )
+            );
 
-          // Changed logic here: For individual routines (single participant) use userHasCompleted
-          // For shared routines (multiple participants) use allCompleted
-          const isIndividualRoutine = routine.participants.length === 1;
+          const isIndividualRoutine = participants.length === 1;
           const shouldShowTask = isIndividualRoutine
             ? !userHasCompleted
             : !allCompleted;
 
           if (shouldShowTask) {
-            routineTasks.push({
-              id: task.id,
-              taskId: task.id,
-              taskName: task.title || "Untitled Task",
-              routineId: routine.id,
-              routineTitle: routine.title,
-              participants: await this.getParticipants(routine.participants),
-              isCompleted: userHasCompleted,
-              allCompleted,
-              todayCompletions,
-              categoryXp: task.categoryXp,
-              description: task.description,
-              createdBy: routine.createdBy,
-              type: "routine",
-              streak: routine.metadata?.currentStreak || 0,
-              lastCompleted: routine.metadata?.lastCompleted || null,
-              completions: Object.fromEntries(
-                Object.entries(task.completions || {}).map(([date, comps]) => [
-                  date,
-                  comps.map((c) => ({
-                    completedBy: c.completedBy,
-                    completedAt: c.completedAt.toMillis(),
-                  })),
-                ])
-              ),
-            });
+            try {
+              const taskParticipants = await this.getParticipants(participants);
+
+              const routineTask: RoutineTaskWithMeta = {
+                id: task.id,
+                taskId: task.id,
+                taskName: task.title,
+                routineId: routine.id,
+                routineTitle: routine.title,
+                participants: taskParticipants,
+                isCompleted: userHasCompleted,
+                allCompleted,
+                todayCompletions,
+                categoryXp: task.categoryXp || {},
+                description: task.description || "",
+                createdBy: routine.createdBy,
+                type: "routine",
+                streak: routine.metadata?.currentStreak || 0,
+                lastCompleted: routine.metadata?.lastCompleted || null,
+                completions: Object.fromEntries(
+                  Object.entries(task.completions || {}).map(
+                    ([date, comps]) => [
+                      date,
+                      comps.map((c) => ({
+                        completedBy: c.completedBy,
+                        completedAt: c.completedAt.toMillis(),
+                      })),
+                    ]
+                  )
+                ),
+              };
+
+              // Validate the task object before adding it
+              if (this.validateRoutineTask(routineTask)) {
+                routineTasks.push(routineTask);
+              } else {
+                console.warn("Invalid routine task object:", routineTask);
+              }
+            } catch (error) {
+              console.error("Error processing routine task:", error);
+              continue;
+            }
           }
         }
       }
 
       return routineTasks;
     } catch (error) {
+      console.error("Error getting active routine tasks:", error);
       throw error;
     }
+  },
+
+  // Add a validation helper function
+  validateRoutineTask(task: RoutineTaskWithMeta): boolean {
+    return !!(
+      task.id &&
+      task.taskId &&
+      task.taskName &&
+      task.routineId &&
+      task.routineTitle &&
+      Array.isArray(task.participants) &&
+      typeof task.isCompleted === "boolean" &&
+      typeof task.allCompleted === "boolean" &&
+      Array.isArray(task.todayCompletions) &&
+      typeof task.categoryXp === "object" &&
+      task.createdBy &&
+      task.type === "routine"
+    );
   },
 
   async inviteToRoutine(

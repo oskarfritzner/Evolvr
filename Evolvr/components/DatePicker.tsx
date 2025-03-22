@@ -34,6 +34,7 @@ export default function CustomDatePicker({
   const [inputError, setInputError] = useState<string | null>(null)
   const [isValid, setIsValid] = useState(true)
   const [isFocused, setIsFocused] = useState(false)
+  const [tempDate, setTempDate] = useState(date)
 
   // Format date for display
   function formatDate(date: Date) {
@@ -50,7 +51,7 @@ export default function CustomDatePicker({
       // MM/DD/YYYY
       {
         regex: /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
-        parse: (m: RegExpMatchArray) => new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]))
+        parse: (m: RegExpMatchArray) => new Date(parseInt(m[3]), parseInt(m[1])-1, parseInt(m[2]))
       },
       // YYYY-MM-DD
       {
@@ -110,6 +111,7 @@ export default function CustomDatePicker({
   // Update input value when date prop changes
   useEffect(() => {
     setInputValue(formatDate(date))
+    setTempDate(date)
   }, [date])
 
   // Update validation when date changes from picker
@@ -123,17 +125,36 @@ export default function CustomDatePicker({
     }
   }, [date]);
 
-  // Update native picker handler
+  // Handle native picker change
   const handleDatePickerChange = (event: any, selectedDate?: Date) => {
-    setShowPicker(Platform.OS === 'ios'); // Keep open on iOS
+    const currentDate = selectedDate || tempDate;
+    
+    if (Platform.OS === 'android') {
+      setShowPicker(false);
+    }
+    
     if (event.type === 'set' && selectedDate) {
-      if (validateDate(selectedDate)) {
-        onDateChange(selectedDate);
-        // Validation will be handled by the useEffect above
+      setTempDate(currentDate);
+      if (validateDate(currentDate)) {
+        onDateChange(currentDate);
       } else {
         setInputError('Date is outside allowed range');
       }
     }
+  };
+
+  const handleConfirm = () => {
+    if (validateDate(tempDate)) {
+      onDateChange(tempDate);
+      setShowPicker(false);
+    } else {
+      setInputError('Date is outside allowed range');
+    }
+  };
+
+  const handleCancel = () => {
+    setTempDate(date);
+    setShowPicker(false);
   };
 
   const styles = StyleSheet.create({
@@ -221,6 +242,36 @@ export default function CustomDatePicker({
     pickerTitle: {
       fontSize: 18,
       fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    buttonRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 20,
+    },
+    modalButton: {
+      padding: 10,
+      borderRadius: 8,
+      minWidth: 100,
+      alignItems: 'center',
+    },
+    confirmButton: {
+      backgroundColor: colors.secondary,
+    },
+    cancelButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    buttonText: {
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    confirmButtonText: {
+      color: colors.primary,
+    },
+    cancelButtonText: {
+      color: colors.textPrimary,
     },
     webDateInput: Platform.select({
       web: {
@@ -236,83 +287,28 @@ export default function CustomDatePicker({
         flex: 1,
         cursor: 'pointer',
       }
-    }) as any, // Type assertion needed for web-specific styles
+    }) as any,
   })
-
-  const renderDatePicker = () => {
-    if (Platform.OS === 'web') {
-      return (
-        <input
-          type="date"
-          value={date.toISOString().split('T')[0]}
-          onChange={(e) => {
-            const newDate = new Date(e.target.value);
-            if (!isNaN(newDate.getTime())) {
-              onDateChange(newDate);
-            }
-          }}
-          min={minDate?.toISOString().split('T')[0]}
-          max={maxDate?.toISOString().split('T')[0]}
-          style={styles.webDateInput}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-        />
-      );
-    }
-
-    if (!showPicker) return null;
-
-    return (
-      <Modal
-        transparent
-        animationType="slide"
-        visible={showPicker}
-        onRequestClose={() => setShowPicker(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowPicker(false)}
-        >
-          <Pressable>
-            <MotiView
-              from={{ translateY: 100, opacity: 0 }}
-              animate={{ translateY: 0, opacity: 1 }}
-              exit={{ translateY: 100, opacity: 0 }}
-              transition={{ type: 'timing', duration: 300 }}
-              style={styles.pickerContainer}
-            >
-              <View style={styles.pickerHeader}>
-                <Text style={[styles.pickerTitle, { color: colors.textPrimary }]}>
-                  Select {label}
-                </Text>
-                <TouchableOpacity onPress={() => setShowPicker(false)}>
-                  <MaterialIcons name="close" size={24} color={colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
-              
-              <DateTimePicker
-                value={date}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={handleDatePickerChange}
-                style={{ backgroundColor: colors.surface }}
-                minimumDate={minDate}
-                maximumDate={maxDate}
-                textColor={colors.textPrimary}
-              />
-            </MotiView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    )
-  }
 
   return (
     <View style={styles.container}>
-      
       <View style={styles.inputRow}>
         {Platform.OS === 'web' ? (
-          renderDatePicker()
+          <input
+            type="date"
+            value={date.toISOString().split('T')[0]}
+            onChange={(e) => {
+              const newDate = new Date(e.target.value);
+              if (!isNaN(newDate.getTime())) {
+                onDateChange(newDate);
+              }
+            }}
+            min={minDate?.toISOString().split('T')[0]}
+            max={maxDate?.toISOString().split('T')[0]}
+            style={styles.webDateInput}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+          />
         ) : (
           <>
             <TextInput
@@ -336,9 +332,69 @@ export default function CustomDatePicker({
                 (error || inputError) && styles.inputError
               ]}
               onPress={() => setShowPicker(true)}
+              testID="datePickerButton"
             >
               <MaterialIcons name="calendar-today" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
+
+            {showPicker && (
+              <Modal
+                transparent
+                visible={showPicker}
+                animationType="slide"
+                onRequestClose={handleCancel}
+              >
+                <Pressable
+                  style={styles.modalOverlay}
+                  onPress={handleCancel}
+                >
+                  <Pressable>
+                    <MotiView
+                      from={{ translateY: 100, opacity: 0 }}
+                      animate={{ translateY: 0, opacity: 1 }}
+                      exit={{ translateY: 100, opacity: 0 }}
+                      transition={{ type: 'timing', duration: 300 }}
+                      style={styles.pickerContainer}
+                    >
+                      <View style={styles.pickerHeader}>
+                        <Text style={styles.pickerTitle}>
+                          Select {label}
+                        </Text>
+                      </View>
+                      
+                      <DateTimePicker
+                        testID="datePicker"
+                        value={tempDate}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={handleDatePickerChange}
+                        style={{ backgroundColor: colors.surface }}
+                        minimumDate={minDate}
+                        maximumDate={maxDate}
+                        textColor={colors.textPrimary}
+                      />
+
+                      {Platform.OS === 'ios' && (
+                        <View style={styles.buttonRow}>
+                          <TouchableOpacity
+                            style={[styles.modalButton, styles.cancelButton]}
+                            onPress={handleCancel}
+                          >
+                            <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.modalButton, styles.confirmButton]}
+                            onPress={handleConfirm}
+                          >
+                            <Text style={[styles.buttonText, styles.confirmButtonText]}>Confirm</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </MotiView>
+                  </Pressable>
+                </Pressable>
+              </Modal>
+            )}
           </>
         )}
       </View>
@@ -352,8 +408,6 @@ export default function CustomDatePicker({
       {(error || inputError) && (
         <Text style={styles.errorText}>{error || inputError}</Text>
       )}
-
-      {Platform.OS !== 'web' && renderDatePicker()}
     </View>
   )
 } 
