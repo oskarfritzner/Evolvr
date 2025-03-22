@@ -1,3 +1,4 @@
+import React from 'react'
 import { Stack } from "expo-router"
 import { useTheme } from "@/context/ThemeContext"
 
@@ -7,12 +8,15 @@ export default function CategoryPagesLayout() {
   return (
     <Stack 
       screenOptions={{ 
-        headerShown: false, // Set to false to remove the default header
-        animation: 'slide_from_right',
-        animationDuration: 200,
+        headerShown: false,
         presentation: 'modal',
+        animation: 'slide_from_bottom',
         gestureEnabled: true,
-        gestureDirection: 'horizontal'
+        gestureDirection: 'vertical',
+        animationDuration: 200,
+        contentStyle: {
+          backgroundColor: 'transparent',
+        }
       }}
     />
   )

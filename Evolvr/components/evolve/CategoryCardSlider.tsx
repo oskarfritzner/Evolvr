@@ -48,7 +48,10 @@ export default function CategoryCardSlider({ onCategoryPress }: CategoryCardSlid
     });
 
   const handleCategoryPress = (categoryId: string) => {
-    router.push(`/(categoryPages)/${categoryId}` as any);
+    router.push({
+      pathname: `/(categoryPages)/${categoryId}`,
+      params: { presentation: 'modal', animation: 'slide_from_bottom' }
+    } as any);
   };
 
   return (
