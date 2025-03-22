@@ -18,6 +18,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { UserData, UserStats, ProgressSnapshot } from "../types/UserData";
 import { FriendData } from "../types/Friend";
 import { postService } from "./postService";
+import { usernameService } from "./usernameService";
 import logger from "@/utils/logger";
 import Toast from "react-native-toast-message";
 
@@ -62,6 +63,10 @@ export const userService = {
       const userRef = doc(db, "users", userId);
       const userDoc = await getDoc(userRef);
       const userData = userDoc.exists() ? (userDoc.data() as UserData) : null;
+
+      if (userData?.username) {
+        await usernameService.releaseUsername(userData.username);
+      }
 
       // Delete user's data from Firestore
       if (userData) {
@@ -260,11 +265,35 @@ export const userService = {
   },
 
   async updateUsername(userId: string, newUsername: string): Promise<void> {
-    const userRef = doc(db, "users", userId);
-    await updateDoc(userRef, {
-      username: newUsername,
-      usernameLower: newUsername.toLowerCase(),
-    });
+    try {
+      // Get current user data
+      const userRef = doc(db, "users", userId);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        throw new Error("User not found");
+      }
+
+      const userData = userDoc.data() as UserData;
+      const oldUsername = userData.username;
+
+      // Update username in both collections
+      await usernameService.updateUsername(oldUsername, newUsername, userId);
+
+      // Update user document
+      await updateDoc(userRef, {
+        username: newUsername,
+        usernameLower: newUsername.toLowerCase(),
+        displayName: newUsername, // Update display name to match username if they're the same
+        displayNameLower: newUsername.toLowerCase(),
+      });
+
+      // Update cache
+      await this.updateUserCache(userId);
+    } catch (error) {
+      logger.error("Error updating username:", error);
+      throw error;
+    }
   },
 
   async migrateUserFields(userId: string) {
@@ -413,11 +442,22 @@ export const userService = {
     data: { username?: string; bio?: string; photoURL?: string }
   ): Promise<void> {
     const userRef = doc(db, "users", userId);
+
+    // If username is being updated, handle it separately
+    if (data.username) {
+      await this.updateUsername(userId, data.username);
+      delete data.username; // Remove username from data to prevent double update
+    }
+
+    // Update other profile fields
     const updates: Partial<UserData> = {
       ...data,
-      ...(data.username && { usernameLower: data.username.toLowerCase() }),
     };
-    await updateDoc(userRef, updates);
+
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(userRef, updates);
+    }
+
     await this.updateUserCache(userId);
   },
 };
