@@ -275,7 +275,7 @@ export default function CustomDatePicker({
     },
     webDateInput: Platform.select({
       web: {
-        '-webkit-appearance': 'none',
+        WebkitAppearance: 'none',
         backgroundColor: colors.surface,
         color: colors.textPrimary,
         padding: 15,

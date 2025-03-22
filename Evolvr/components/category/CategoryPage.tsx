@@ -67,7 +67,7 @@ export function CategoryPage({
         <View style={[categoryPageStyles.heroSection, { backgroundColor: color }]}>
           <TouchableOpacity 
             style={categoryPageStyles.backButton}
-            onPress={() => router.push('/(tabs)/dashboard')}
+            onPress={() => router.back()}
           >
             <FontAwesome5 name="chevron-left" size={24} color="#fff" />
           </TouchableOpacity>

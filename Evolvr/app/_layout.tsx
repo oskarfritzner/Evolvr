@@ -62,7 +62,6 @@ export default function RootLayout() {
                           <Stack.Screen name="(modals)" options={{ headerShown: false }} />
                           <Stack.Screen name="(profile)" options={{ headerShown: false }} />
                           <Stack.Screen name="(categoryPages)" options={{ headerShown: false }} />
-                          <Stack.Screen name="(pages)" options={{ headerShown: true }} />
                           <Stack.Screen name="index" options={{ headerShown: false }} />
                         </Stack>
                         <ClientSideToast />

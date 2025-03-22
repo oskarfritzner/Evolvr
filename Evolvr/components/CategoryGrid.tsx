@@ -43,7 +43,10 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ categories, style, compact 
             icon={getCategoryIcon(id)}
             level={category.level}
             currentXP={category.xp}
-            onPress={() => router.push(`/(categoryPages)/${id}` as any)}
+            onPress={() => router.push({
+              pathname: `/(categoryPages)/${id}`,
+              params: { presentation: 'modal', animation: 'slide_from_bottom' }
+            } as any)}
             compact={compact}
           />
         ))}

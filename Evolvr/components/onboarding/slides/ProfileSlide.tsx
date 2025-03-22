@@ -35,30 +35,92 @@ interface ProfileSlideProps {
   }) => void;
 }
 
+// Add function to resize image for web
+const resizeImage = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (readerEvent: ProgressEvent<FileReader>) => {
+      const img = document.createElement('img');
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxSize = 500; // Max width/height
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height *= maxSize / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width *= maxSize / height;
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Convert to JPEG with reduced quality
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(dataUrl);
+      };
+      img.src = readerEvent.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 export function ProfileSlide({ profile, onChange }: ProfileSlideProps) {
   const { colors } = useTheme();
   const [isPickerVisible, setIsPickerVisible] = useState(false);
   const isWeb = Platform.OS === 'web';
 
   const handleImageSelection = () => {
-    Alert.alert(
-      "Profile Photo",
-      "Choose a photo from your library or take a new one",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "Take Photo",
-          onPress: () => takePhoto()
-        },
-        {
-          text: "Choose from Library",
-          onPress: () => pickImage()
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (file) {
+          try {
+            const resizedImage = await resizeImage(file);
+            onChange({ ...profile, photoURL: resizedImage });
+          } catch (error) {
+            console.error('Error processing image:', error);
+            Alert.alert(
+              "Error",
+              "Failed to process the image. Please try a different image."
+            );
+          }
         }
-      ]
-    );
+      };
+      input.click();
+    } else {
+      Alert.alert(
+        "Profile Photo",
+        "Choose a photo from your library or take a new one",
+        [
+          {
+            text: "Cancel",
+            style: "cancel"
+          },
+          {
+            text: "Take Photo",
+            onPress: () => takePhoto()
+          },
+          {
+            text: "Choose from Library",
+            onPress: () => pickImage()
+          }
+        ]
+      );
+    }
   };
 
   const takePhoto = async () => {

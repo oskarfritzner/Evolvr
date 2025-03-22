@@ -149,13 +149,12 @@ export default function Notification({
             <TouchableOpacity
               style={[styles.viewButton, { 
                 backgroundColor: colors.secondary,
-                borderWidth: 1,
-                borderColor: colors.border,
+                borderWidth: 0,
               }]}
               onPress={onPress}
             >
               <Text style={[styles.actionButtonText, { 
-                color: colors.textPrimary,
+                color: colors.primary,
                 fontWeight: '600'
               }]}>
                 View Routine
@@ -178,20 +177,27 @@ export default function Notification({
             <View style={styles.actions}>
               {onAccept && (
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.acceptButton, { backgroundColor: colors.primary }]}
+                  style={[styles.actionButton, styles.acceptButton, { 
+                    backgroundColor: colors.secondary,
+                    borderWidth: 0,
+                  }]}
                   onPress={onAccept}
                 >
-                  <Text style={styles.actionButtonText}>
+                  <Text style={[styles.actionButtonText, { color: colors.primary }]}>
                     {notification.type === NotificationTypes.FRIEND_REQUEST ? 'Accept' : 'Join'}
                   </Text>
                 </TouchableOpacity>
               )}
               {onDecline && (
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.declineButton, { borderColor: colors.error }]}
+                  style={[styles.actionButton, styles.declineButton, { 
+                    backgroundColor: 'transparent',
+                    borderColor: colors.border,
+                    borderWidth: 1,
+                  }]}
                   onPress={onDecline}
                 >
-                  <Text style={[styles.actionButtonText, { color: colors.error }]}>
+                  <Text style={[styles.actionButtonText, { color: colors.textPrimary }]}>
                     Decline
                   </Text>
                 </TouchableOpacity>
