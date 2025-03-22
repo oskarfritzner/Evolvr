@@ -25,16 +25,13 @@ interface User extends FirebaseUser {
 }
 
 // Define AuthContextType
-export interface AuthContextType {
-  user: {
-    uid: string;
-    userData?: UserData | null;
-  } | null;
+interface AuthContextType {
+  user: { uid: string; userData?: UserData | null } | null;
   isLoading: boolean;
   isInitialized: boolean;
   signOut: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<FirebaseUser>;
-  refreshUserData: (userId: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<User>;
+  refreshUserData: (userId: string) => Promise<UserData | null>;
 }
 
 // Create AuthContext
@@ -173,35 +170,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (userDoc.exists()) {
               // Complete user, set up listeners and state
               const userData = userDoc.data() as UserData;
+              
+              // Set initial user state
               setUser({
-                uid: firebaseUser.uid,
+                ...firebaseUser,
                 userData,
               });
 
-              // Set up user data listener
-              if (unsubscribeUserData) {
-                unsubscribeUserData();
-              }
-              
-              const unsubUserData = onSnapshot(
-                doc(db, "users", firebaseUser.uid),
-                (doc) => {
-                  if (doc.exists()) {
-                    const newUserData = doc.data() as UserData;
-                    setUserData(newUserData);
-                    queryClient.setQueryData(["userData", firebaseUser.uid], newUserData);
-                    
-                    setUser(prev => prev ? {
-                      ...prev,
-                      userData: newUserData
-                    } : null);
+              // Set up user data listener with retry mechanism
+              const setupUserDataListener = async (retries = 3) => {
+                try {
+                  if (unsubscribeUserData) {
+                    unsubscribeUserData();
                   }
-                },
-                (error) => {
-                  logger.error('User data listener error:', error);
+                  
+                  const unsubUserData = onSnapshot(
+                    doc(db, "users", firebaseUser.uid),
+                    (doc) => {
+                      if (doc.exists()) {
+                        const newUserData = doc.data() as UserData;
+                        setUserData(newUserData);
+                        queryClient.setQueryData(["userData", firebaseUser.uid], newUserData);
+                        
+                        setUser(prev => prev ? {
+                          ...prev,
+                          userData: newUserData
+                        } : null);
+                      }
+                    },
+                    async (error) => {
+                      logger.error('User data listener error:', error);
+                      if (retries > 0) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        setupUserDataListener(retries - 1);
+                      }
+                    }
+                  );
+                  setUnsubscribeUserData(() => unsubUserData);
+                } catch (error) {
+                  logger.error('Error setting up user data listener:', error);
+                  if (retries > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    setupUserDataListener(retries - 1);
+                  }
                 }
-              );
-              setUnsubscribeUserData(() => unsubUserData);
+              };
+
+              await setupUserDataListener();
 
               // Set up notifications listener
               if (unsubscribeNotifications) {
@@ -209,42 +224,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
               }
               const unsubNotifications = notificationService.subscribeToUnreadCount(firebaseUser.uid);
               setUnsubscribeNotifications(() => unsubNotifications);
+
             } else {
-              // User exists but no userData - could be in onboarding
-              setUser({
-                uid: firebaseUser.uid,
-                userData: null,
-              });
+              // Check if user is in incomplete users collection
+              const incompleteUser = await registrationService.get(firebaseUser.uid);
+              
+              if (incompleteUser && !incompleteUser.onboardingComplete) {
+                setUser({
+                  ...firebaseUser,
+                  userData: null
+                });
+              } else {
+                setUser(null);
+              }
             }
           } else {
             setUser(null);
-            if (unsubscribeUserData) {
-              unsubscribeUserData();
-              setUnsubscribeUserData(null);
-            }
-            if (unsubscribeNotifications) {
-              unsubscribeNotifications();
-              setUnsubscribeNotifications(null);
-            }
           }
         } catch (error) {
           logger.error('Auth state change error:', error);
           setUser(null);
         } finally {
-          setIsLoading(false);
           setIsInitialized(true);
+          setIsLoading(false);
         }
       });
     };
 
     setupAuth();
-
     return () => {
       if (unsubscribeAuth) unsubscribeAuth();
       if (unsubscribeUserData) unsubscribeUserData();
       if (unsubscribeNotifications) unsubscribeNotifications();
     };
-  }, [queryClient]);
+  }, []);
 
   const signOut = async () => {
     try {
@@ -302,15 +315,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userDoc = await getDoc(doc(db, "users", userId));
       if (userDoc.exists()) {
         const newUserData = userDoc.data() as UserData;
-        setUserData(newUserData);
+        
+        // Update React Query cache
         queryClient.setQueryData(["userData", userId], newUserData);
-        setUser(prev => prev ? {
-          ...prev,
-          userData: newUserData
-        } : null);
+        
+        // Update auth context state
+        setUserData(newUserData);
+        setUser(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            userData: newUserData
+          };
+        });
+
+        return newUserData;
       }
+      return null;
     } catch (error) {
-      logger.error('Error refreshing user data:', error);
+      console.error('Error refreshing user data:', error);
+      throw error;
     }
   };
 

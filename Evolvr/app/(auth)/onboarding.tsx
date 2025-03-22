@@ -13,6 +13,7 @@ import { useAuth } from "@/context/AuthContext"
 import { useRouter } from "expo-router"
 import { db, auth } from "@/backend/config/firebase"
 import { doc, deleteDoc } from "firebase/firestore"
+import { signInWithEmailAndPassword } from "firebase/auth"
 import { MotiView } from 'moti'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -27,6 +28,7 @@ import Toast from 'react-native-toast-message'
 import { MaterialIcons } from '@expo/vector-icons'
 import { registrationService } from '@/backend/services/registrationService'
 import { useRegistration } from '@/hooks/auth/useRegistration'
+import { userService } from '@/backend/services/userService'
 
 // Suppress findDOMNode warning
 LogBox.ignoreLogs(['findDOMNode']);
@@ -34,7 +36,7 @@ LogBox.ignoreLogs(['findDOMNode']);
 export default function OnboardingScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUserData } = useAuth();
   const insets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState(1);
   const [profile, setProfile] = useState({
@@ -72,27 +74,57 @@ export default function OnboardingScreen() {
               setIsCanceling(true);
               
               if (user?.uid) {
-                // Delete incomplete user document
-                await registrationService.deleteIncompleteUser(user.uid);
-                
-                // Delete the auth user
-                await auth.currentUser?.delete();
+                // First, ensure we have a fresh token
+                try {
+                  const currentUser = auth.currentUser;
+                  if (currentUser) {
+                    await currentUser.getIdToken(true); // Force token refresh
+                  }
+                } catch (error) {
+                  console.error('Error refreshing token:', error);
+                }
+
+                // Delete data in this order to ensure cleanup
+                try {
+                  // 1. Delete incomplete user document first
+                  await registrationService.deleteIncompleteUser(user.uid);
+                } catch (error) {
+                  console.error('Error deleting incomplete user:', error);
+                }
+
+                try {
+                  // 2. Delete the auth user
+                  if (auth.currentUser) {
+                    await auth.currentUser.delete();
+                  }
+                } catch (error) {
+                  console.error('Error deleting auth user:', error);
+                }
               }
               
-              // Clear registration data from storage
+              // 3. Clear registration data and storage regardless of previous steps
               clearRegistrationData();
               await AsyncStorage.multiRemove(['onboardingCompleted']);
               
-              // Sign out and redirect to sign in
+              // 4. Sign out and redirect
               await signOut();
               router.replace('/(auth)/sign-in');
               
             } catch (error) {
               console.error('Error canceling registration:', error);
+              
+              // Even if there's an error, try to sign out and redirect
+              try {
+                await signOut();
+                router.replace('/(auth)/sign-in');
+              } catch (signOutError) {
+                console.error('Error signing out after registration cancel:', signOutError);
+              }
+
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: 'Failed to cancel registration. Please try again.',
+                text2: 'Failed to cancel registration completely, but you have been signed out.',
               });
             } finally {
               setIsCanceling(false);
@@ -101,6 +133,25 @@ export default function OnboardingScreen() {
         }
       ]
     );
+  };
+
+  // Helper function to wait for user data with retries
+  const waitForUserData = async (userId: string, maxRetries = 3): Promise<boolean> => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const userData = await userService.getUserData(userId);
+        if (userData) {
+          await refreshUserData(userId);
+          return true;
+        }
+        // Wait before next retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error(`Retry ${i + 1} failed:`, error);
+        if (i === maxRetries - 1) throw error;
+      }
+    }
+    return false;
   };
 
   const handleNext = async () => {
@@ -148,12 +199,16 @@ export default function OnboardingScreen() {
         }
 
         // Complete registration and create full user
-        await registrationService.completeRegistration(user.uid, {
+        const finalUserData = {
           email: registrationData?.email,
           ...profile,
-          mood,
-          motivation,
-          goal,
+          onboardingInfo: {
+            completedAt: new Date(),
+            mood,
+            motivation,
+            goal,
+            birthDate: profile.birthDate,
+          },
           categories: {},
           overall: { level: 1, xp: 0, prestige: 0 },
           stats: {
@@ -166,14 +221,61 @@ export default function OnboardingScreen() {
             totalChallengesJoined: 0,
             todayXP: 0,
             todayCompletedTasks: [],
-          }
-        });
+          },
+          friends: [],
+          activeTasks: [],
+          posts: [],
+          subscription: {
+            type: "FREE",
+            startDate: new Date(),
+            status: "active",
+            autoRenew: false
+          },
+          displayName: profile.username,
+          usernameLower: profile.username.toLowerCase(),
+          displayNameLower: profile.username.toLowerCase(),
+          createdAt: new Date(),
+          lastUpdated: new Date()
+        };
+
+        // Complete registration
+        await registrationService.completeRegistration(user.uid, finalUserData);
 
         // Clear registration data
         clearRegistrationData();
         
-        // Navigate to home
-        router.push('/dashboard');
+        // Set welcome modal flag
+        await AsyncStorage.setItem(`should_show_welcome_${user.uid}`, 'true');
+
+        // Force token refresh and get new token
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          await currentUser.getIdToken(true);
+        }
+
+        // Wait for user data to be available with retries
+        let userData = null;
+        for (let i = 0; i < 5; i++) {
+          try {
+            userData = await userService.getUserData(user.uid);
+            if (userData) {
+              console.log("User data loaded:", userData);
+              await refreshUserData(user.uid);
+              break;
+            }
+          } catch (error) {
+            console.error(`Retry ${i + 1} failed:`, error);
+          }
+          // Wait before next retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        if (!userData) {
+          throw new Error('Failed to load user data after multiple retries');
+        }
+
+        // Navigate to dashboard
+        router.replace('/(tabs)/dashboard');
       } catch (error) {
         console.error('Error completing registration:', error);
         Toast.show({
