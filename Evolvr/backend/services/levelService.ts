@@ -349,10 +349,19 @@ export const levelService = {
       const userDoc = await getDoc(userRef);
       const userData = userDoc.data() as UserData;
 
+      // Normalize category names to lowercase
+      let normalizedXpGains = Object.entries(xpGains).reduce(
+        (acc, [category, xp]) => ({
+          ...acc,
+          [category.toLowerCase()]: xp,
+        }),
+        {} as Record<string, number>
+      );
+
       // Update the routine task check to use completedTasks
       if (taskType === "routine") {
         const today = new Date().toDateString();
-        const taskId = Object.keys(xpGains)[0];
+        const taskId = Object.keys(normalizedXpGains)[0];
         const isCompletedToday = userData.completedTasks?.some(
           (task) =>
             task.taskId === taskId &&
@@ -369,7 +378,7 @@ export const levelService = {
       }
 
       const todayXP = userData.stats?.todayXP || 0;
-      const baseXPTotal = Object.values(xpGains).reduce(
+      const baseXPTotal = Object.values(normalizedXpGains).reduce(
         (sum, xp) => sum + (xp || 0),
         0
       );
@@ -379,13 +388,13 @@ export const levelService = {
       if (taskType !== "normal") {
         xpMultiplier = this.calculateXPMultiplier(userData, taskType, userId);
         // Apply multiplier to each category individually instead of the total
-        xpGains = Object.fromEntries(
-          Object.entries(xpGains).map(([category, xp]) => [
+        normalizedXpGains = Object.fromEntries(
+          Object.entries(normalizedXpGains).map(([category, xp]) => [
             category,
             Math.floor((xp || 0) * xpMultiplier),
           ])
         );
-        totalXPToAdd = Object.values(xpGains).reduce(
+        totalXPToAdd = Object.values(normalizedXpGains).reduce(
           (sum, xp) => sum + (xp || 0),
           0
         );
@@ -401,14 +410,14 @@ export const levelService = {
         taskType === "normal" ? 1 : adjustedXPToAdd / totalXPToAdd;
 
       const adjustedXpGains = Object.fromEntries(
-        Object.entries(xpGains).map(([category, xp]) => [
+        Object.entries(normalizedXpGains).map(([category, xp]) => [
           category,
           Math.min(Math.floor((xp || 0) * adjustmentFactor), remainingDailyXP),
         ])
       );
 
       // Format categories for toast message
-      const categories = Object.keys(xpGains)
+      const categories = Object.keys(normalizedXpGains)
         .map((cat) => cat.charAt(0).toUpperCase() + cat.slice(1))
         .join(", ");
 
