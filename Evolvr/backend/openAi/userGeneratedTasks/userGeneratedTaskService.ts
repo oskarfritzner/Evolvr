@@ -7,10 +7,13 @@ import {
   increment,
 } from "firebase/firestore";
 import { db } from "@/backend/config/firebase";
-import { azureAIService } from "./azure-ai";
+import { AIService } from "@/backend/openAi/aiService";
 import type { TaskStatus } from "@/backend/types/Task";
 import type { UserData } from "@/backend/types/UserData";
 import { levelService } from "@/backend/services/levelService";
+
+// Initialize AIService with environment variable
+const aiService = new AIService();
 
 export interface CreateTaskInput {
   title: string;
@@ -49,8 +52,8 @@ class UserGeneratedTaskService {
     userId,
   }: CreateTaskInput): Promise<CreateTaskResult> {
     try {
-      // Step 1: Evaluate the task using Azure AI
-      const evaluation = await azureAIService.evaluateTask(title, description);
+      // Step 1: Evaluate the task using AI
+      const evaluation = await aiService.evaluateTask(title, description);
 
       // Check if task is valid and passes safety checks
       if (!evaluation.isValid || !evaluation.safetyCheck?.passed) {

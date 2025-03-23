@@ -1,9 +1,12 @@
 import { config } from "dotenv";
 import { resolve } from "path";
-import { azureAIService } from "../azure-ai";
+import { AIService } from "../aiService";
+
+// Initialize AIService with environment variable
+const aiService = new AIService();
 
 // Load environment variables from .env file
-config({ path: resolve(__dirname, "../.env") });
+config();
 
 async function testUserGeneratedTask() {
   try {
@@ -21,7 +24,7 @@ async function testUserGeneratedTask() {
     console.log("\nProcessing...\n");
 
     // First, evaluate the task
-    const evaluation = await azureAIService.evaluateTask(
+    const evaluation = await aiService.evaluateTask(
       testTask.title,
       testTask.description
     );

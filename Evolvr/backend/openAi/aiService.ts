@@ -1,14 +1,5 @@
-import { AzureOpenAI } from "openai";
+import OpenAI from "openai";
 import { categories } from "@/constants/categories";
-
-// Configuration object with deployment-specific settings
-const AZURE_CONFIG = {
-  apiKey:
-    "LWJOTNvZYzqqVOoLH7WZvJ4qVpUW7O4qWudJQzGjrweCAzpwVXQ2JQQJ99BCACfhMk5XJ3w3AAAAACOGpr6A",
-  endpoint: "https://osfr0-m8kph947-swedencentral.cognitiveservices.azure.com",
-  deployment: "gpt-4",
-  apiVersion: "2024-02-01",
-};
 
 // Interface definitions
 export interface ChatMessage {
@@ -31,13 +22,27 @@ export interface TaskEvaluation {
   };
 }
 
-class AzureAIService {
-  private client: AzureOpenAI;
+export class AIService {
+  private client: OpenAI;
   private lastRequestTime: number = 0;
   private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds minimum between requests
 
-  constructor() {
-    this.client = new AzureOpenAI(AZURE_CONFIG);
+  constructor(apiKey?: string) {
+    // Try to get the API key from constructor or environment variables
+    const key =
+      apiKey ||
+      process.env.OPENAI_API_KEY ||
+      process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+
+    if (!key) {
+      throw new Error(
+        "OpenAI API key is not provided and not found in environment variables"
+      );
+    }
+
+    this.client = new OpenAI({
+      apiKey: key,
+    });
   }
 
   private async enforceRateLimit(): Promise<void> {
@@ -102,7 +107,7 @@ If the task fails safety checks, set isValid to false and provide constructive f
       await this.enforceRateLimit();
 
       const response = await this.client.chat.completions.create({
-        model: AZURE_CONFIG.deployment,
+        model: "gpt-4-turbo-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Title: ${title}\nDesc: ${description}` },
@@ -113,28 +118,39 @@ If the task fails safety checks, set isValid to false and provide constructive f
       });
 
       const result = response.choices[0].message?.content || "";
-      const evaluation = JSON.parse(result) as TaskEvaluation;
+      console.log("OpenAI Response:", result);
 
-      // Only validate categories and XP if the task passed safety checks
-      if (evaluation.isValid && evaluation.safetyCheck?.passed) {
-        evaluation.categories = evaluation.categories.filter((cat) =>
-          categories.some((c) => c.id === cat)
-        );
+      try {
+        // Remove any markdown code block syntax and get just the JSON
+        const jsonStr = result.replace(/```json\n?|\n?```/g, "").trim();
+        console.log("Cleaned JSON:", jsonStr);
 
-        evaluation.categoryXp = Object.entries(evaluation.categoryXp)
-          .filter(([cat]) => categories.some((c) => c.id === cat))
-          .reduce(
-            (acc, [cat, xp]) => ({
-              ...acc,
-              [cat]: Math.min(Math.max(Math.round(xp), 10), 100),
-            }),
-            {}
+        const evaluation = JSON.parse(jsonStr) as TaskEvaluation;
+
+        // Only validate categories and XP if the task passed safety checks
+        if (evaluation.isValid && evaluation.safetyCheck?.passed) {
+          evaluation.categories = evaluation.categories.filter((cat) =>
+            categories.some((c) => c.name === cat)
           );
-      }
 
-      return evaluation;
+          evaluation.categoryXp = Object.entries(evaluation.categoryXp)
+            .filter(([cat]) => categories.some((c) => c.name === cat))
+            .reduce(
+              (acc, [cat, xp]) => ({
+                ...acc,
+                [cat]: Math.min(Math.max(Math.round(xp), 10), 100),
+              }),
+              {}
+            );
+        }
+
+        return evaluation;
+      } catch (parseError) {
+        console.error("Failed to parse OpenAI response:", parseError);
+        throw new Error("Failed to parse task evaluation response");
+      }
     } catch (error) {
-      console.error("Azure OpenAI Error:", error);
+      console.error("OpenAI Error:", error);
       if (error instanceof Error && error.message.includes("429")) {
         throw new Error("Rate limit exceeded. Please try again in a minute.");
       }
@@ -142,5 +158,3 @@ If the task fails safety checks, set isValid to false and provide constructive f
     }
   }
 }
-
-export const azureAIService = new AzureAIService();

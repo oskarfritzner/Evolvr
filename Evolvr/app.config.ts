@@ -10,6 +10,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: "automatic",
   scheme: "evolvr",
   extra: {
+    OPENAI_API_KEY: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
     AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
     AZURE_OPENAI_API_KEY: process.env.AZURE_OPENAI_API_KEY,
   }, // Your app's URL scheme
