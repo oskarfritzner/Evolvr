@@ -36,7 +36,7 @@ interface ChatUIProps {
 
 const COACH_PERSONALITIES: Record<CoachPersonality, string> = {
   default: "Evolve Coach",
-  goggins: "Goggins Mode"
+  goggins: "Stay Hard Mode"
 };
 
 export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
@@ -67,7 +67,7 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
     // Initialize chat based on mode
     if (mode === 'mindsetCoach') {
       const initialMessage = coachPersonality === "goggins" 
-        ? "LISTEN UP! I'm David Goggins, and I'm here to help you overcome that weak mind of yours. I've been through hell and back - 3 Hell Weeks, over 60 ultra marathons, pulled myself up from rock bottom. What's your excuse? What's holding you back? TELL ME NOW! STAY HARD! 💪"
+        ? "WHO'S GONNA CARRY THE BOATS?! 💪 Time to callus your mind and push beyond your limits! I don't accept excuses, only results. You're capable of 20X more than you think. What's holding you back? TELL ME NOW! STAY HARD! 💪"
         : "Hi! I'm Evolve, your personal mindset coach. 🌱 I'm here to support your growth journey, provide insights, and help you develop positive habits. What's on your mind today?";
       
       setMessages([
@@ -501,28 +501,50 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
     if (!showPersonalitySelector) return null;
 
     return (
-      <View style={[styles.modeMenu, { 
+      <View style={[styles.personalitySelector, { 
         backgroundColor: colors.surfaceContainer,
         borderColor: colors.border,
-        right: 16, // Position on the right side
-        left: undefined
       }]}>
         {Object.entries(COACH_PERSONALITIES).map(([key, name]) => (
           <TouchableOpacity 
             key={key}
             style={[
-              styles.modeMenuItem, 
+              styles.personalityItem,
               { 
-                borderBottomColor: colors.border,
                 backgroundColor: coachPersonality === key ? colors.primary + '20' : 'transparent'
               }
             ]}
             onPress={() => handlePersonalitySelect(key as CoachPersonality)}
           >
-            <Text style={[styles.modeMenuText, { color: colors.textPrimary }]}>{name}</Text>
+            <Text style={[styles.personalityItemText, { color: colors.textPrimary }]}>
+              {name}
+            </Text>
+            {coachPersonality === key && (
+              <FontAwesome5 
+                name="check" 
+                size={12} 
+                color={colors.textPrimary} 
+                style={styles.checkIcon}
+              />
+            )}
           </TouchableOpacity>
         ))}
       </View>
+    );
+  };
+
+  const renderOverlay = () => {
+    if (!showModeSelector && !showPersonalitySelector) return null;
+
+    return (
+      <TouchableOpacity
+        style={[styles.overlay]}
+        activeOpacity={1}
+        onPress={() => {
+          setShowModeSelector(false);
+          setShowPersonalitySelector(false);
+        }}
+      />
     );
   };
 
@@ -532,6 +554,7 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
       style={[styles.container, { backgroundColor: colors.background }]}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      {renderOverlay()}
       <View style={styles.headerContainer}>
         <View style={styles.headerLeft}>
           <TouchableOpacity 
@@ -543,7 +566,11 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
             }]}
             onPress={() => setShowModeSelector(true)}
           >
-            <Text style={[styles.modeSelectorText, { color: colors.textPrimary }]}>
+            <Text 
+              style={[styles.modeSelectorText, { color: colors.textPrimary }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {getModeDisplayName(mode)}
             </Text>
             <FontAwesome5 name="chevron-down" size={12} color={colors.textSecondary} style={{ marginLeft: 4 }} />
@@ -552,19 +579,30 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
           {mode === 'mindsetCoach' && (
             <>
               <TouchableOpacity
-                style={[styles.modeSelector, { 
-                  backgroundColor: colors.surfaceContainer,
-                  borderRadius: 8,
+                style={[styles.personalityButton, { 
+                  backgroundColor: coachPersonality === 'goggins' ? colors.primary + '20' : colors.surfaceContainer,
                   borderWidth: 1,
                   borderColor: colors.border,
-                  marginLeft: 8
                 }]}
                 onPress={() => setShowPersonalitySelector(!showPersonalitySelector)}
               >
-                <Text style={[styles.modeSelectorText, { color: colors.textPrimary }]}>
-                  {COACH_PERSONALITIES[coachPersonality]}
+                <FontAwesome5 
+                  name={coachPersonality === 'goggins' ? 'fire' : 'smile'} 
+                  size={12} 
+                  color={colors.textSecondary} 
+                />
+                <Text 
+                  style={[
+                    styles.personalityButtonText, 
+                    { 
+                      color: colors.textPrimary,
+                      marginLeft: 4,
+                    }
+                  ]}
+                  numberOfLines={1}
+                >
+                  {coachPersonality === 'goggins' ? '🔥 Stay Hard' : '🌱 Evolve'}
                 </Text>
-                <FontAwesome5 name="chevron-down" size={12} color={colors.textSecondary} style={{ marginLeft: 4 }} />
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -631,10 +669,10 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
                 <Text style={[styles.thinkingText, { color: colors.textSecondary }]}>
                   {isTyping 
                     ? coachPersonality === "goggins" 
-                      ? "Goggins is coming at you... 💪" 
+                      ? "Getting after it... 💪" 
                       : "Evolve is typing..."
                     : coachPersonality === "goggins"
-                      ? "Getting after it..."
+                      ? "Taking souls..."
                       : "Thinking..."
                   }
                 </Text>
@@ -667,10 +705,13 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
   closeButton: {
     padding: 8,
     borderRadius: 8,
+    zIndex: 11,
   },
   contentContainer: {
     flex: 1,
@@ -689,6 +730,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     height: 40,
+    maxWidth: '50%',
   },
   modeSelectorText: {
     fontSize: 14,
@@ -803,5 +845,59 @@ const styles = StyleSheet.create({
   thinkingText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  personalityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginLeft: 8,
+    minWidth: 80,
+  },
+  personalityButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  personalitySelector: {
+    position: 'absolute',
+    top: 50,
+    right: 56,
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
+    zIndex: 1000,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    width: 150,
+  },
+  personalityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  personalityItemText: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  checkIcon: {
+    marginLeft: 8,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 5,
   },
 }); 
