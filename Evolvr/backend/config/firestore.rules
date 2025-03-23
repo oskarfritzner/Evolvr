@@ -69,7 +69,7 @@ service cloud.firestore {
                        'lastActive', 'activeTasks', 'stats', 'habits', 'challenges',
                        'lastRoutineSync', 'displayName', 'photoURL', 'username', 
                        'bio', 'level', 'xp', 'badges', 'achievements', 'cachedData',
-                       'completedTasks', 'progress', 'overall', 'categories']) ||
+                       'completedTasks', 'progress', 'overall', 'categories', 'userGeneratedTasks']) ||
             // Or allow incrementing stats and removing from activeTasks
             (
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stats', 'activeTasks']) &&

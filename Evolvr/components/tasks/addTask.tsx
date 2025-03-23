@@ -16,6 +16,7 @@ import { Platform } from 'react-native';
 import { RoutineTask } from '@/backend/types/Routine';
 import { useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
+import { ChatModal } from '@/components/chat';
 
 interface Props {
   visible: boolean;
@@ -108,6 +109,30 @@ const staticStyles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  createTaskButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  createTaskButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  buttonIcon: {
+    marginRight: 2,
+  },
 });
 
 const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded }) => {
@@ -126,6 +151,7 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
   const panY = useRef(new Animated.Value(0)).current;
   const screenHeight = Dimensions.get('screen').height;
   const queryClient = useQueryClient();
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const resetPositionAnim = Animated.timing(panY, {
     toValue: 0,
@@ -346,17 +372,25 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
             <View style={[staticStyles.dragIndicator, { backgroundColor: colors.border }]} />
           </View>
 
-          <TouchableOpacity 
-            style={staticStyles.closeButton} 
-            onPress={onClose}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons 
-              name="close" 
-              size={24} 
-              color={colors.textSecondary} 
-            />
-          </TouchableOpacity>
+          <View style={staticStyles.headerContainer}>
+            <TouchableOpacity
+              style={[staticStyles.createTaskButton, { backgroundColor: colors.secondary }]}
+              onPress={() => setIsChatOpen(true)}
+            >
+              <FontAwesome5 name="magic" size={14} color={colors.primary} style={staticStyles.buttonIcon} />
+              <Text style={[staticStyles.createTaskButtonText, { color: colors.primary }]}>
+                Create Custom Task
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={staticStyles.closeButton} 
+              onPress={onClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
           <SafeAreaView style={staticStyles.safeArea}>
             <TextInput
@@ -466,6 +500,15 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
             {errorMessage && <ErrorMessage message={errorMessage} fadeAnim={errorAnim} />}
           </SafeAreaView>
         </View>
+
+        <ChatModal
+          visible={isChatOpen}
+          onClose={() => {
+            setIsChatOpen(false);
+            loadTasks(); // Reload tasks to show any new ones
+          }}
+          mode="taskGenerator"
+        />
       </SafeAreaViewRN>
     </Modal>
   );
