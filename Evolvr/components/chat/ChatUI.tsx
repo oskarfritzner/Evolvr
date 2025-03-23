@@ -560,7 +560,12 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
           {renderMessages()}
           {(isEvaluating || isTyping) && (
             <View style={[styles.loadingContainer, { backgroundColor: colors.surfaceContainer }]}>
-              <ActivityIndicator color={colors.primary} />
+              <View style={styles.thinkingContainer}>
+                <Text style={[styles.thinkingText, { color: colors.textSecondary }]}>
+                  {isTyping ? "Evolve is typing..." : "Thinking..."}
+                </Text>
+                <ActivityIndicator color={colors.primary} size="small" style={{ marginLeft: 8 }} />
+              </View>
             </View>
           )}
         </ScrollView>
@@ -711,8 +716,18 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginVertical: 4,
+    alignSelf: 'flex-start',
+    maxWidth: '80%',
+  },
+  thinkingContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
+  },
+  thinkingText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 }); 
