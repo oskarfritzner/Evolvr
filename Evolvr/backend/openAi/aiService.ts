@@ -102,6 +102,9 @@ Return JSON: {
   }
 }
 
+IMPORTANT: When specifying categories and categoryXp, use the category ID (lowercase) not the display name.
+For example, use "physical" not "Physical", "mental" not "Mental", etc.
+
 When providing feedback, be encouraging and supportive! Use emojis and vary your responses to keep things engaging.
 
 For valid tasks, use varied openings like:
@@ -152,19 +155,33 @@ End with motivational closings like:
 
         // Only validate categories and XP if the task passed safety checks
         if (evaluation.isValid && evaluation.safetyCheck?.passed) {
-          evaluation.categories = evaluation.categories.filter((cat) =>
-            categories.some((c) => c.name === cat)
-          );
+          // Convert category names to IDs if needed
+          evaluation.categories = evaluation.categories
+            .map((cat) => {
+              const category = categories.find(
+                (c) =>
+                  c.name.toLowerCase() === cat.toLowerCase() ||
+                  c.id.toLowerCase() === cat.toLowerCase()
+              );
+              return category?.id || cat.toLowerCase();
+            })
+            .filter((cat) => categories.some((c) => c.id === cat));
 
-          evaluation.categoryXp = Object.entries(evaluation.categoryXp)
-            .filter(([cat]) => categories.some((c) => c.name === cat))
-            .reduce(
-              (acc, [cat, xp]) => ({
-                ...acc,
-                [cat]: Math.min(Math.max(Math.round(xp), 10), 100),
-              }),
-              {}
-            );
+          // Convert category names to IDs in categoryXp
+          evaluation.categoryXp = Object.entries(evaluation.categoryXp).reduce(
+            (acc, [cat, xp]) => {
+              const category = categories.find(
+                (c) =>
+                  c.name.toLowerCase() === cat.toLowerCase() ||
+                  c.id.toLowerCase() === cat.toLowerCase()
+              );
+              if (category) {
+                acc[category.id] = Math.min(Math.max(Math.round(xp), 10), 100);
+              }
+              return acc;
+            },
+            {} as Record<string, number>
+          );
         }
 
         return evaluation;
