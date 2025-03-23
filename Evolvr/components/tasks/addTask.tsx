@@ -507,7 +507,7 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
             setIsChatOpen(false);
             loadTasks(); // Reload tasks to show any new ones
           }}
-          mode="taskGenerator"
+          mode="taskCreator"
         />
       </SafeAreaViewRN>
     </Modal>

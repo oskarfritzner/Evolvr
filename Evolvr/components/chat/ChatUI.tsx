@@ -23,7 +23,7 @@ interface Message {
 }
 
 interface ChatUIProps {
-  mode: 'taskGenerator' | 'goalDivider' | 'mindsetCoach';
+  mode: 'taskCreator' | 'goalDivider' | 'mindsetCoach';
   onClose?: () => void;
 }
 
@@ -40,12 +40,12 @@ export function ChatUI({ mode, onClose }: ChatUIProps) {
 
   useEffect(() => {
     // Initialize chat based on mode
-    if (mode === 'taskGenerator') {
+    if (mode === 'taskCreator') {
       setMessages([
         {
           id: '1',
           type: 'system',
-          content: 'Welcome to the Task Generator! Please provide a task title and description.',
+          content: 'Welcome to the Task Creator! Please provide a task title and description.',
         },
       ]);
     }
@@ -142,14 +142,14 @@ export function ChatUI({ mode, onClose }: ChatUIProps) {
       {
         id: '1',
         type: 'system',
-        content: 'Welcome to the Task Generator! Please provide a task title and description.',
+        content: 'Welcome to the Task Creator! Please provide a task title and description.',
       },
     ]);
   };
 
-  const getModeDisplayName = (mode: 'taskGenerator' | 'goalDivider' | 'mindsetCoach') => {
+  const getModeDisplayName = (mode: 'taskCreator' | 'goalDivider' | 'mindsetCoach') => {
     switch (mode) {
-      case 'taskGenerator':
+      case 'taskCreator':
         return 'Task Creator';
       case 'goalDivider':
         return 'Goal Divider';
@@ -160,7 +160,7 @@ export function ChatUI({ mode, onClose }: ChatUIProps) {
     }
   };
 
-  const handleModeSelect = (selectedMode: 'taskGenerator' | 'goalDivider' | 'mindsetCoach') => {
+  const handleModeSelect = (selectedMode: 'taskCreator' | 'goalDivider' | 'mindsetCoach') => {
     if (selectedMode === 'goalDivider' || selectedMode === 'mindsetCoach') {
       setMessages(prev => [
         ...prev,
@@ -171,7 +171,7 @@ export function ChatUI({ mode, onClose }: ChatUIProps) {
         },
       ]);
     } else {
-      // Reset the chat for task generator
+      // Reset the chat for task creator
       resetChat();
     }
     setShowModeSelector(false);
@@ -206,7 +206,7 @@ export function ChatUI({ mode, onClose }: ChatUIProps) {
         }]}>
           <TouchableOpacity 
             style={[styles.modeMenuItem, { borderBottomColor: colors.border }]}
-            onPress={() => handleModeSelect('taskGenerator')}
+            onPress={() => handleModeSelect('taskCreator')}
           >
             <Text style={[styles.modeMenuText, { color: colors.textPrimary }]}>Task Creator</Text>
           </TouchableOpacity>
@@ -267,7 +267,7 @@ export function ChatUI({ mode, onClose }: ChatUIProps) {
         )}
       </ScrollView>
 
-      {mode === 'taskGenerator' && !isComplete ? (
+      {mode === 'taskCreator' && !isComplete ? (
         <View style={[styles.inputContainer, { backgroundColor: colors.surface }]}>
           <TextInput
             label="Task Title"
@@ -323,7 +323,7 @@ export function ChatUI({ mode, onClose }: ChatUIProps) {
             <Text style={[styles.submitButtonText, { color: colors.background }]}>Create Task</Text>
           </TouchableOpacity>
         </View>
-      ) : mode === 'taskGenerator' && isComplete ? (
+      ) : mode === 'taskCreator' && isComplete ? (
         <View style={[styles.completedContainer, { backgroundColor: colors.surface }]}>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.secondary }]}

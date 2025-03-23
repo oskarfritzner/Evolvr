@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 interface ChatModalProps {
   visible: boolean;
   onClose: () => void;
-  mode: 'taskGenerator' | 'goalDivider';
+  mode: 'taskCreator' | 'goalDivider' | 'mindsetCoach';
 }
 
 export function ChatModal({ visible, onClose, mode }: ChatModalProps) {
