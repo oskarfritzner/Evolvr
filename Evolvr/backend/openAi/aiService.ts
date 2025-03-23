@@ -345,6 +345,13 @@ End with motivational closings like:
   ): Promise<ChatMessage> {
     const systemPrompt = COACH_SYSTEM_PROMPTS[personality];
 
+    // Define personality-specific token limits
+    const maxTokens = {
+      default: 150, // Concise, supportive responses
+      goggins: 100, // Short, intense responses
+      pete: 120, // Balanced, precise responses
+    }[personality];
+
     try {
       await this.enforceRateLimit();
 
@@ -355,12 +362,12 @@ End with motivational closings like:
             role: "system",
             content:
               systemPrompt +
-              "\n\nIMPORTANT: Keep all responses under 150 words and focus on one key point per message.",
+              "\n\nIMPORTANT: Keep all responses under 100 words and focus on one key point per message.",
           },
           { role: "user", content: message },
         ],
         temperature: 0.7,
-        max_tokens: 250, // Reduced from 500 to enforce brevity
+        max_tokens: maxTokens,
         top_p: 1,
       });
 
