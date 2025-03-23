@@ -48,14 +48,23 @@ export function useCoachingChat(personality: CoachPersonality = "default") {
         newMessage.content.includes("completed") ||
         newMessage.content.includes("great job") ||
         newMessage.content.includes("congratulations") ||
-        newMessage.content.includes("STAY HARD")
+        newMessage.content.includes("STAY HARD") ||
+        newMessage.content.includes("meaningful") ||
+        newMessage.content.includes("responsibility")
       ) {
         Toast.show({
           type: "success",
-          text1: personality === "goggins" ? "STAY HARD! 💪" : "Keep it up! 🌟",
+          text1:
+            personality === "goggins"
+              ? "STAY HARD! 💪"
+              : personality === "pete"
+              ? "Order from Chaos 🦞"
+              : "Keep it up! 🌟",
           text2:
             personality === "goggins"
               ? "You're getting after it! No excuses!"
+              : personality === "pete"
+              ? "You're taking responsibility for your path forward."
               : "You're making great progress on your journey.",
           visibilityTime: 3000,
         });
@@ -84,10 +93,17 @@ export function useCoachingChat(personality: CoachPersonality = "default") {
       queryClient.setQueryData(["coaching", user?.uid, personality], []);
       Toast.show({
         type: "success",
-        text1: personality === "goggins" ? "Clean slate! 💪" : "Chat cleared",
+        text1:
+          personality === "goggins"
+            ? "Clean slate! 💪"
+            : personality === "pete"
+            ? "Order restored! 🦞"
+            : "Chat cleared",
         text2:
           personality === "goggins"
             ? "Time to get after it again! No excuses!"
+            : personality === "pete"
+            ? "Time to articulate your thoughts with precision."
             : "Starting fresh with your mindset coach",
         visibilityTime: 3000,
       });

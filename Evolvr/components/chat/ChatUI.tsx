@@ -36,7 +36,8 @@ interface ChatUIProps {
 
 const COACH_PERSONALITIES: Record<CoachPersonality, string> = {
   default: "Evolve Coach",
-  goggins: "Stay Hard Mode"
+  goggins: "Stay Hard Mode",
+  pete: "Order & Meaning"
 };
 
 export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
@@ -68,6 +69,8 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
     if (mode === 'mindsetCoach') {
       const initialMessage = coachPersonality === "goggins" 
         ? "WHO'S GONNA CARRY THE BOATS?! 💪 Time to callus your mind and push beyond your limits! I don't accept excuses, only results. You're capable of 20X more than you think. What's holding you back? TELL ME NOW! STAY HARD! 💪"
+        : coachPersonality === "pete"
+        ? "Well... it's quite remarkable that you're here. That's a sign you're willing to face the chaos voluntarily, and that's no small thing. 🦞 What meaningful challenge are you wrestling with today? Remember, the truth is the path forward, so speak carefully and precisely about what's troubling you."
         : "Hi! I'm Evolve, your personal mindset coach. 🌱 I'm here to support your growth journey, provide insights, and help you develop positive habits. What's on your mind today?";
       
       setMessages([
@@ -580,14 +583,24 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
             <>
               <TouchableOpacity
                 style={[styles.personalityButton, { 
-                  backgroundColor: coachPersonality === 'goggins' ? colors.primary + '20' : colors.surfaceContainer,
+                  backgroundColor: coachPersonality === 'goggins' 
+                    ? colors.primary + '20' 
+                    : coachPersonality === 'pete'
+                    ? colors.secondary + '20'
+                    : colors.surfaceContainer,
                   borderWidth: 1,
                   borderColor: colors.border,
                 }]}
                 onPress={() => setShowPersonalitySelector(!showPersonalitySelector)}
               >
                 <FontAwesome5 
-                  name={coachPersonality === 'goggins' ? 'fire' : 'smile'} 
+                  name={
+                    coachPersonality === 'goggins' 
+                      ? 'fire' 
+                      : coachPersonality === 'pete'
+                      ? 'brain'
+                      : 'smile'
+                  } 
                   size={12} 
                   color={colors.textSecondary} 
                 />
@@ -601,7 +614,11 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
                   ]}
                   numberOfLines={1}
                 >
-                  {coachPersonality === 'goggins' ? '🔥 Stay Hard' : '🌱 Evolve'}
+                  {coachPersonality === 'goggins' 
+                    ? '🔥 Stay Hard' 
+                    : coachPersonality === 'pete'
+                    ? '🦞 Order & Meaning'
+                    : '🌱 Evolve'}
                 </Text>
               </TouchableOpacity>
               
@@ -670,9 +687,13 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
                   {isTyping 
                     ? coachPersonality === "goggins" 
                       ? "Getting after it... 💪" 
+                      : coachPersonality === "pete"
+                      ? "Contemplating the chaos... 🦞"
                       : "Evolve is typing..."
                     : coachPersonality === "goggins"
                       ? "Taking souls..."
+                      : coachPersonality === "pete"
+                      ? "Finding order..."
                       : "Thinking..."
                   }
                 </Text>
