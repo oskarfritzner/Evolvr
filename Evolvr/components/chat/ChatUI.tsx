@@ -18,6 +18,7 @@ import { userGeneratedTaskService } from '@/backend/openAi/userGeneratedTasks/us
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Ionicons } from '@expo/vector-icons';
 import { useCoachingChat } from '@/hooks/useCoachingChat';
+import { CoachPersonality } from '@/backend/openAi/aiService';
 
 interface Message {
   id: string;
@@ -33,6 +34,11 @@ interface ChatUIProps {
   onModeChange?: (mode: 'taskCreator' | 'goalDivider' | 'mindsetCoach') => void;
 }
 
+const COACH_PERSONALITIES: Record<CoachPersonality, string> = {
+  default: "Evolve Coach",
+  goggins: "Goggins Mode"
+};
+
 export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -45,24 +51,30 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [coachPersonality, setCoachPersonality] = useState<CoachPersonality>("default");
+  const [showPersonalitySelector, setShowPersonalitySelector] = useState(false);
   
-  // Add coaching chat hook
+  // Add coaching chat hook with personality
   const { 
     messages: coachingMessages, 
     isTyping, 
     sendMessage: sendCoachingMessage,
     clearChat,
     isSending 
-  } = useCoachingChat();
+  } = useCoachingChat(coachPersonality);
 
   useEffect(() => {
     // Initialize chat based on mode
     if (mode === 'mindsetCoach') {
+      const initialMessage = coachPersonality === "goggins" 
+        ? "LISTEN UP! I'm David Goggins, and I'm here to help you overcome that weak mind of yours. I've been through hell and back - 3 Hell Weeks, over 60 ultra marathons, pulled myself up from rock bottom. What's your excuse? What's holding you back? TELL ME NOW! STAY HARD! 💪"
+        : "Hi! I'm Evolve, your personal mindset coach. 🌱 I'm here to support your growth journey, provide insights, and help you develop positive habits. What's on your mind today?";
+      
       setMessages([
         {
           id: '1',
           type: 'system',
-          content: "Hi! I'm Evolve, your personal mindset coach. 🌱 I'm here to support your growth journey, provide insights, and help you develop positive habits. What's on your mind today?"
+          content: initialMessage
         },
       ]);
     } else if (mode === 'taskCreator') {
@@ -74,7 +86,7 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
         },
       ]);
     }
-  }, [mode]);
+  }, [mode, coachPersonality]);
 
   useEffect(() => {
     const keyboardWillShow = (event: KeyboardEvent) => {
@@ -274,6 +286,12 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
       onModeChange?.(selectedMode);
     }
     setShowModeSelector(false);
+  };
+
+  const handlePersonalitySelect = (personality: CoachPersonality) => {
+    setCoachPersonality(personality);
+    setShowPersonalitySelector(false);
+    clearChat();
   };
 
   // Update the input section based on mode
@@ -479,6 +497,35 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
     }
   };
 
+  const renderPersonalitySelector = () => {
+    if (!showPersonalitySelector) return null;
+
+    return (
+      <View style={[styles.modeMenu, { 
+        backgroundColor: colors.surfaceContainer,
+        borderColor: colors.border,
+        right: 16, // Position on the right side
+        left: undefined
+      }]}>
+        {Object.entries(COACH_PERSONALITIES).map(([key, name]) => (
+          <TouchableOpacity 
+            key={key}
+            style={[
+              styles.modeMenuItem, 
+              { 
+                borderBottomColor: colors.border,
+                backgroundColor: coachPersonality === key ? colors.primary + '20' : 'transparent'
+              }
+            ]}
+            onPress={() => handlePersonalitySelect(key as CoachPersonality)}
+          >
+            <Text style={[styles.modeMenuText, { color: colors.textPrimary }]}>{name}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -503,12 +550,30 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
           </TouchableOpacity>
           
           {mode === 'mindsetCoach' && (
-            <TouchableOpacity
-              onPress={() => clearChat()}
-              style={[styles.clearButton, { backgroundColor: colors.surfaceContainer }]}
-            >
-              <Ionicons name="refresh" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={[styles.modeSelector, { 
+                  backgroundColor: colors.surfaceContainer,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  marginLeft: 8
+                }]}
+                onPress={() => setShowPersonalitySelector(!showPersonalitySelector)}
+              >
+                <Text style={[styles.modeSelectorText, { color: colors.textPrimary }]}>
+                  {COACH_PERSONALITIES[coachPersonality]}
+                </Text>
+                <FontAwesome5 name="chevron-down" size={12} color={colors.textSecondary} style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={() => clearChat()}
+                style={[styles.clearButton, { backgroundColor: colors.surfaceContainer }]}
+              >
+                <Ionicons name="refresh" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </>
           )}
         </View>
         <TouchableOpacity
@@ -545,6 +610,8 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
         </View>
       )}
 
+      {renderPersonalitySelector()}
+
       <View style={styles.contentContainer}>
         <ScrollView
           ref={scrollViewRef}
@@ -562,7 +629,14 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
             <View style={[styles.loadingContainer, { backgroundColor: colors.surfaceContainer }]}>
               <View style={styles.thinkingContainer}>
                 <Text style={[styles.thinkingText, { color: colors.textSecondary }]}>
-                  {isTyping ? "Evolve is typing..." : "Thinking..."}
+                  {isTyping 
+                    ? coachPersonality === "goggins" 
+                      ? "Goggins is coming at you... 💪" 
+                      : "Evolve is typing..."
+                    : coachPersonality === "goggins"
+                      ? "Getting after it..."
+                      : "Thinking..."
+                  }
                 </Text>
                 <ActivityIndicator color={colors.primary} size="small" style={{ marginLeft: 8 }} />
               </View>

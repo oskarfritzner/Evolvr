@@ -4,16 +4,17 @@ import {
   coachingService,
   CoachingMessage,
 } from "@/backend/services/coachingService";
+import { CoachPersonality } from "@/backend/openAi/aiService";
 import { useAuth } from "@/context/AuthContext";
 import Toast from "react-native-toast-message";
 
-export function useCoachingChat() {
+export function useCoachingChat(personality: CoachPersonality = "default") {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isTyping, setIsTyping] = useState(false);
 
   const { data: messages = [], isLoading } = useQuery({
-    queryKey: ["coaching", user?.uid],
+    queryKey: ["coaching", user?.uid, personality],
     queryFn: () => {
       if (!user?.uid) throw new Error("User not authenticated");
       return coachingService.getSessionHistory(user.uid);
@@ -26,11 +27,11 @@ export function useCoachingChat() {
     mutationFn: async (message: string) => {
       if (!user?.uid) throw new Error("User not authenticated");
       setIsTyping(true);
-      return coachingService.sendMessage(user.uid, message);
+      return coachingService.sendMessage(user.uid, message, personality);
     },
     onSuccess: (newMessage) => {
       queryClient.setQueryData<CoachingMessage[]>(
-        ["coaching", user?.uid],
+        ["coaching", user?.uid, personality],
         (old = []) => {
           // Ensure proper ordering by timestamp
           const updatedMessages = [...old, newMessage].sort((a, b) => {
@@ -46,12 +47,16 @@ export function useCoachingChat() {
       if (
         newMessage.content.includes("completed") ||
         newMessage.content.includes("great job") ||
-        newMessage.content.includes("congratulations")
+        newMessage.content.includes("congratulations") ||
+        newMessage.content.includes("STAY HARD")
       ) {
         Toast.show({
           type: "success",
-          text1: "Keep it up! 🌟",
-          text2: "You're making great progress on your journey.",
+          text1: personality === "goggins" ? "STAY HARD! 💪" : "Keep it up! 🌟",
+          text2:
+            personality === "goggins"
+              ? "You're getting after it! No excuses!"
+              : "You're making great progress on your journey.",
           visibilityTime: 3000,
         });
       }
@@ -76,11 +81,14 @@ export function useCoachingChat() {
       return coachingService.clearSession(user.uid);
     },
     onSuccess: () => {
-      queryClient.setQueryData(["coaching", user?.uid], []);
+      queryClient.setQueryData(["coaching", user?.uid, personality], []);
       Toast.show({
         type: "success",
-        text1: "Chat cleared",
-        text2: "Starting fresh with your mindset coach",
+        text1: personality === "goggins" ? "Clean slate! 💪" : "Chat cleared",
+        text2:
+          personality === "goggins"
+            ? "Time to get after it again! No excuses!"
+            : "Starting fresh with your mindset coach",
         visibilityTime: 3000,
       });
     },
@@ -96,7 +104,9 @@ export function useCoachingChat() {
   });
 
   return {
-    messages,
+    messages: messages.filter(
+      (m) => m.personality === personality || !m.personality
+    ),
     isLoading,
     isTyping,
     isSending: sendMessageMutation.isPending,
