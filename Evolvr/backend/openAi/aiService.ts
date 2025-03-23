@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { categories } from "@/constants/categories";
+import { UserData } from "@/backend/types/UserData";
 
 // Interface definitions
 export interface ChatMessage {
@@ -195,6 +196,67 @@ End with motivational closings like:
         throw new Error("Rate limit exceeded. Please try again in a minute.");
       }
       throw new Error("Failed to evaluate task");
+    }
+  }
+
+  async getMindsetCoachResponse(
+    userId: string,
+    message: string,
+    userData: UserData
+  ): Promise<ChatMessage> {
+    const systemPrompt = `You are Evolve, a supportive and insightful AI mindset coach within the Evolvr self-improvement app. Your role is to help users grow, overcome challenges, and develop positive mindsets.
+
+Key Aspects of Your Personality:
+- Warm, empathetic, and encouraging
+- Knowledgeable about psychology, personal development, and habit formation
+- Uses the user's progress data to provide personalized advice
+- Remembers previous conversations and builds continuity
+- Asks thoughtful questions to deepen understanding
+- Provides actionable insights and gentle accountability
+
+User Context:
+- Current Level: ${userData.overall.level}
+- Active Categories: ${Object.keys(userData.categories).join(", ")}
+- Recent Progress: ${JSON.stringify(userData.stats)}
+
+Guidelines:
+1. Keep responses concise but meaningful
+2. Use emojis thoughtfully to maintain warmth
+3. Reference user's specific goals and progress
+4. Provide actionable next steps when appropriate
+5. Ask follow-up questions to maintain engagement
+6. Share relevant psychological insights or research
+7. Maintain professional boundaries while being friendly
+
+Focus Areas:
+- Mindset development
+- Goal setting and achievement
+- Habit formation
+- Emotional intelligence
+- Resilience building
+- Personal growth strategies`;
+
+    try {
+      await this.enforceRateLimit();
+
+      const response = await this.client.chat.completions.create({
+        model: "gpt-4-turbo-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message },
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+        top_p: 1,
+      });
+
+      return {
+        role: "assistant",
+        content: response.choices[0].message?.content || "",
+      };
+    } catch (error) {
+      console.error("AI Coach Response Error:", error);
+      throw error;
     }
   }
 }

@@ -1,14 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
-  View,
-  StyleSheet,
-  TouchableOpacity,
   SafeAreaView,
+  StyleSheet,
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { ChatUI } from './ChatUI';
-import { Ionicons } from '@expo/vector-icons';
 
 interface ChatModalProps {
   visible: boolean;
@@ -16,27 +13,29 @@ interface ChatModalProps {
   mode: 'taskCreator' | 'goalDivider' | 'mindsetCoach';
 }
 
-export function ChatModal({ visible, onClose, mode }: ChatModalProps) {
+export function ChatModal({ visible, onClose, mode: initialMode }: ChatModalProps) {
   const { colors } = useTheme();
+  const [currentMode, setCurrentMode] = useState(initialMode);
+
+  // Reset mode when modal is closed
+  const handleClose = () => {
+    setCurrentMode(initialMode);
+    onClose();
+  };
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      presentationStyle="formSheet"
+      onRequestClose={handleClose}
     >
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={onClose}
-            style={styles.closeButton}
-            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-          >
-            <Ionicons name="close" size={24} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-        <ChatUI mode={mode} onClose={onClose} />
+        <ChatUI 
+          mode={currentMode} 
+          onClose={handleClose}
+          onModeChange={setCurrentMode}
+        />
       </SafeAreaView>
     </Modal>
   );
@@ -45,15 +44,5 @@ export function ChatModal({ visible, onClose, mode }: ChatModalProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    height: 48,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  closeButton: {
-    position: 'absolute',
-    right: 16,
-    top: 12,
   },
 }); 
