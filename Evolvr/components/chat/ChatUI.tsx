@@ -303,13 +303,54 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
       return (
         <View style={[styles.inputContainer, { backgroundColor: colors.surface }]}>
           <View style={styles.inputRow}>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                label="Message"
+                value={message}
+                onChangeText={setMessage}
+                style={[styles.input, { backgroundColor: colors.surface, paddingRight: 48 }]}
+                mode="outlined"
+                multiline
+                disabled={isEvaluating}
+                theme={{
+                  colors: {
+                    primary: colors.secondary,
+                    text: colors.textPrimary,
+                    placeholder: colors.textSecondary,
+                    background: colors.surface,
+                    disabled: colors.labelDisabled,
+                    onSurfaceVariant: colors.textSecondary,
+                    onSurface: colors.textPrimary,
+                  }
+                }}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  {
+                    backgroundColor: colors.secondary,
+                    opacity: isEvaluating || !message.trim() ? 0.5 : 1,
+                  },
+                ]}
+                onPress={handleSubmit}
+                disabled={isEvaluating || !message.trim()}
+              >
+                <Ionicons name="send" size={20} color={colors.background} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    } else if (mode === 'taskCreator') {
+      return (
+        <View style={[styles.inputContainer, { backgroundColor: colors.surface }]}>
+          <View style={styles.inputFields}>
             <TextInput
-              label="Message"
-              value={message}
-              onChangeText={setMessage}
+              label="Task Title"
+              value={title}
+              onChangeText={setTitle}
               style={[styles.input, { backgroundColor: colors.surface }]}
               mode="outlined"
-              multiline
               disabled={isEvaluating}
               theme={{
                 colors: {
@@ -323,65 +364,28 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
                 }
               }}
             />
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                {
-                  backgroundColor: colors.secondary,
-                  opacity: isEvaluating || !message.trim() ? 0.5 : 1,
-                },
-              ]}
-              onPress={handleSubmit}
-              disabled={isEvaluating || !message.trim()}
-            >
-              <Ionicons name="send" size={20} color={colors.background} />
-            </TouchableOpacity>
+            <TextInput
+              label="Task Description"
+              value={description}
+              onChangeText={setDescription}
+              style={[styles.input, { backgroundColor: colors.surface }]}
+              mode="outlined"
+              multiline
+              numberOfLines={3}
+              disabled={isEvaluating}
+              theme={{
+                colors: {
+                  primary: colors.secondary,
+                  text: colors.textPrimary,
+                  placeholder: colors.textSecondary,
+                  background: colors.surface,
+                  disabled: colors.labelDisabled,
+                  onSurfaceVariant: colors.textSecondary,
+                  onSurface: colors.textPrimary,
+                }
+              }}
+            />
           </View>
-        </View>
-      );
-    } else if (mode === 'taskCreator') {
-      return (
-        <View style={[styles.inputContainer, { backgroundColor: colors.surface }]}>
-          <TextInput
-            label="Task Title"
-            value={title}
-            onChangeText={setTitle}
-            style={[styles.input, { backgroundColor: colors.surface }]}
-            mode="outlined"
-            disabled={isEvaluating}
-            theme={{
-              colors: {
-                primary: colors.secondary,
-                text: colors.textPrimary,
-                placeholder: colors.textSecondary,
-                background: colors.surface,
-                disabled: colors.labelDisabled,
-                onSurfaceVariant: colors.textSecondary,
-                onSurface: colors.textPrimary,
-              }
-            }}
-          />
-          <TextInput
-            label="Task Description"
-            value={description}
-            onChangeText={setDescription}
-            style={[styles.input, { backgroundColor: colors.surface }]}
-            mode="outlined"
-            multiline
-            numberOfLines={3}
-            disabled={isEvaluating}
-            theme={{
-              colors: {
-                primary: colors.secondary,
-                text: colors.textPrimary,
-                placeholder: colors.textSecondary,
-                background: colors.surface,
-                disabled: colors.labelDisabled,
-                onSurfaceVariant: colors.textSecondary,
-                onSurface: colors.textPrimary,
-              }
-            }}
-          />
           <TouchableOpacity
             style={[
               styles.submitButton,
@@ -580,63 +584,64 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
           </TouchableOpacity>
           
           {mode === 'mindsetCoach' && (
-            <>
-              <TouchableOpacity
-                style={[styles.personalityButton, { 
-                  backgroundColor: coachPersonality === 'goggins' 
-                    ? colors.primary + '20' 
+            <TouchableOpacity
+              style={[styles.personalityButton, { 
+                backgroundColor: coachPersonality === 'goggins' 
+                  ? colors.primary + '20' 
+                  : coachPersonality === 'pete'
+                  ? colors.secondary + '20'
+                  : colors.surfaceContainer,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }]}
+              onPress={() => setShowPersonalitySelector(!showPersonalitySelector)}
+            >
+              <FontAwesome5 
+                name={
+                  coachPersonality === 'goggins' 
+                    ? 'fire' 
                     : coachPersonality === 'pete'
-                    ? colors.secondary + '20'
-                    : colors.surfaceContainer,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }]}
-                onPress={() => setShowPersonalitySelector(!showPersonalitySelector)}
+                    ? 'brain'
+                    : 'smile'
+                } 
+                size={12} 
+                color={colors.textSecondary} 
+              />
+              <Text 
+                style={[
+                  styles.personalityButtonText, 
+                  { 
+                    color: colors.textPrimary,
+                    marginLeft: 4,
+                  }
+                ]}
+                numberOfLines={1}
               >
-                <FontAwesome5 
-                  name={
-                    coachPersonality === 'goggins' 
-                      ? 'fire' 
-                      : coachPersonality === 'pete'
-                      ? 'brain'
-                      : 'smile'
-                  } 
-                  size={12} 
-                  color={colors.textSecondary} 
-                />
-                <Text 
-                  style={[
-                    styles.personalityButtonText, 
-                    { 
-                      color: colors.textPrimary,
-                      marginLeft: 4,
-                    }
-                  ]}
-                  numberOfLines={1}
-                >
-                  {coachPersonality === 'goggins' 
-                    ? '🔥 Stay Hard' 
-                    : coachPersonality === 'pete'
-                    ? '🦞 Order & Meaning'
-                    : '🌱 Evolve'}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                onPress={() => clearChat()}
-                style={[styles.clearButton, { backgroundColor: colors.surfaceContainer }]}
-              >
-                <Ionicons name="refresh" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </>
+                {coachPersonality === 'goggins' 
+                  ? '🔥 Stay Hard' 
+                  : coachPersonality === 'pete'
+                  ? '🦞 Order'
+                  : '🌱 Evolve'}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity
-          onPress={onClose}
-          style={[styles.closeButton, { backgroundColor: colors.surfaceContainer }]}
-        >
-          <Ionicons name="close" size={24} color={colors.textSecondary} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {mode === 'mindsetCoach' && (
+            <TouchableOpacity
+              onPress={() => clearChat()}
+              style={[styles.clearButton, { backgroundColor: colors.surfaceContainer }]}
+            >
+              <Ionicons name="refresh" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.closeButton, { backgroundColor: colors.surfaceContainer }]}
+          >
+            <Ionicons name="close" size={24} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {showModeSelector && (
@@ -729,6 +734,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   closeButton: {
     padding: 8,
     borderRadius: 8,
@@ -751,7 +761,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     height: 40,
-    maxWidth: '50%',
+    maxWidth: '70%',
   },
   modeSelectorText: {
     fontSize: 14,
@@ -772,17 +782,25 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-    padding: 8,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+  },
+  inputFields: {
+    gap: 12,
+    marginBottom: 16,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 8,
   },
-  input: {
+  inputWrapper: {
     flex: 1,
-    maxHeight: 100,
+    position: 'relative',
+  },
+  input: {
+    width: '100%',
   },
   sendButton: {
     width: 40,
@@ -790,7 +808,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
+    position: 'absolute',
+    right: 8,
+    top: 10,
+    zIndex: 1,
   },
   submitButton: {
     width: '100%',
@@ -850,7 +871,7 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 8,
     borderRadius: 8,
-    marginLeft: 8,
+    zIndex: 11,
   },
   loadingContainer: {
     padding: 12,
