@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/backend/config/firebase";
 import { AIService } from "@/backend/openAi/aiService";
-import type { TaskStatus } from "@/backend/types/Task";
+import type { TaskStatus, TaskType } from "@/backend/types/Task";
 import type { UserData } from "@/backend/types/UserData";
 import { levelService } from "@/backend/services/levelService";
 
@@ -38,6 +38,8 @@ export interface CreateTaskResult {
     tags: string[];
     completed: boolean;
     status: TaskStatus;
+    type: TaskType;
+    createdBy: string;
   };
   evaluation?: {
     feedback: string;
@@ -105,6 +107,8 @@ class UserGeneratedTaskService {
             tags: existingTask.tags,
             completed: existingTask.completed,
             status: existingTask.status as TaskStatus,
+            type: existingTask.type as TaskType,
+            createdBy: existingTask.createdBy,
           },
         };
       }
@@ -150,7 +154,11 @@ class UserGeneratedTaskService {
           success: false,
           message:
             similarMessages[Math.floor(Math.random() * similarMessages.length)],
-          task: similarTask,
+          task: {
+            ...similarTask,
+            type: "user-generated" as TaskType,
+            createdBy: userId,
+          },
         };
       }
 
@@ -165,6 +173,8 @@ class UserGeneratedTaskService {
         tags: evaluation.tags,
         completed: false,
         status: "PENDING" as TaskStatus,
+        type: "user-generated" as TaskType,
+        createdBy: userId,
       };
 
       // Step 5: Add task to user's userGeneratedTasks array

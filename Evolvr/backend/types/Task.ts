@@ -11,7 +11,12 @@ export interface TaskContext {
   participants: string[]; // Type of the task context
 }
 
-export type TaskType = "normal" | "challenge" | "habit" | "routine";
+export type TaskType =
+  | "normal"
+  | "challenge"
+  | "habit"
+  | "routine"
+  | "user-generated";
 
 export enum TaskStatus {
   PENDING = "PENDING",

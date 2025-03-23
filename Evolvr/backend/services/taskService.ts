@@ -17,6 +17,7 @@ import {
 import { db } from "@/backend/config/firebase";
 import Task, { TaskStatus, TaskType, TaskCompletion } from "../types/Task";
 import { levelService } from "./levelService";
+import { auth } from "@/backend/config/firebase";
 
 class TaskService {
   async createTask(task: Partial<Task>): Promise<string> {
@@ -66,6 +67,71 @@ class TaskService {
     completionData?: Partial<TaskCompletion>
   ): Promise<Task> {
     try {
+      // First check if it's a user-generated task
+      const userRef = doc(db, "users", userId);
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) throw new Error("User not found");
+
+      const userData = userDoc.data();
+      const userGeneratedTask = userData.userGeneratedTasks?.find(
+        (t: any) => t.id === taskId
+      );
+
+      if (userGeneratedTask) {
+        // Handle user-generated task completion
+        const completedAt = Timestamp.now();
+        const updatedTasks = userData.userGeneratedTasks.map((t: any) =>
+          t.id === taskId
+            ? {
+                ...t,
+                status: TaskStatus.COMPLETED,
+                completed: true,
+                completedAt,
+                lastUpdatedBy: userId,
+              }
+            : t
+        );
+
+        const batch = writeBatch(db);
+
+        // Update the task in userGeneratedTasks
+        batch.update(userRef, {
+          userGeneratedTasks: updatedTasks,
+          "stats.totalTasksCompleted": increment(1),
+          activeTasks: arrayRemove(taskId),
+        });
+
+        // Create completion document
+        const completionRef = doc(
+          collection(db, "users", userId, "completions")
+        );
+        batch.set(completionRef, {
+          taskId,
+          completedAt,
+          type: "normal",
+          categoryXp: userGeneratedTask.categoryXp,
+          ...completionData,
+        } as TaskCompletion);
+
+        await batch.commit();
+
+        // Award XP for completing the task
+        await levelService.addXP(
+          userId,
+          userGeneratedTask.categoryXp,
+          "normal",
+          userGeneratedTask.title
+        );
+
+        return {
+          ...userGeneratedTask,
+          completed: true,
+          completedAt,
+          status: TaskStatus.COMPLETED,
+        };
+      }
+
+      // If not user-generated, handle normal task completion
       const taskRef = doc(db, "tasks", taskId);
       const taskDoc = await getDoc(taskRef);
       if (!taskDoc.exists()) throw new Error("Task not found");
@@ -95,7 +161,6 @@ class TaskService {
       } as TaskCompletion);
 
       // Update user stats
-      const userRef = doc(db, "users", userId);
       batch.update(userRef, {
         "stats.totalTasksCompleted": increment(1),
         activeTasks: arrayRemove(taskId),
@@ -163,9 +228,19 @@ class TaskService {
     try {
       const tasksRef = collection(db, "tasks");
       const querySnapshot = await getDocs(tasksRef);
-      return querySnapshot.docs.map(
+      const systemTasks = querySnapshot.docs.map(
         (doc) => ({ id: doc.id, ...doc.data() } as Task)
       );
+
+      // Get current user's generated tasks if authenticated
+      const currentUser = auth.currentUser;
+      let userGeneratedTasks: Task[] = [];
+      if (currentUser?.uid) {
+        userGeneratedTasks = await this.getUserGeneratedTasks(currentUser.uid);
+      }
+
+      // Combine system tasks and user-generated tasks
+      return [...systemTasks, ...userGeneratedTasks];
     } catch (error) {
       throw error;
     }
@@ -218,7 +293,23 @@ class TaskService {
       if (!taskIds.length) return [];
 
       const tasks: Task[] = [];
+      const currentUser = auth.currentUser;
+
+      // Get user's generated tasks if authenticated
+      let userGeneratedTasks: Task[] = [];
+      if (currentUser?.uid) {
+        userGeneratedTasks = await this.getUserGeneratedTasks(currentUser.uid);
+      }
+
       for (const taskId of taskIds) {
+        // First check in user-generated tasks
+        const userTask = userGeneratedTasks.find((t) => t.id === taskId);
+        if (userTask) {
+          tasks.push(userTask);
+          continue;
+        }
+
+        // If not found in user tasks, check system tasks
         const taskRef = doc(db, "tasks", taskId);
         const taskDoc = await getDoc(taskRef);
         if (taskDoc.exists()) {
@@ -231,6 +322,24 @@ class TaskService {
       }
       return tasks;
     } catch (error) {
+      return [];
+    }
+  }
+
+  async getUserGeneratedTasks(userId: string): Promise<Task[]> {
+    try {
+      const userRef = doc(db, "users", userId);
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) return [];
+
+      const userData = userDoc.data();
+      return (userData.userGeneratedTasks || []).map((task) => ({
+        ...task,
+        type: "user-generated",
+        createdBy: userId,
+      }));
+    } catch (error) {
+      console.error("Error getting user generated tasks:", error);
       return [];
     }
   }

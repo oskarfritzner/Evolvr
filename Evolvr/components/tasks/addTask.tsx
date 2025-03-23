@@ -133,6 +133,15 @@ const staticStyles = StyleSheet.create({
   buttonIcon: {
     marginRight: 2,
   },
+  myTasksChip: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 80,
+    alignItems: 'center',
+  },
 });
 
 const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded }) => {
@@ -152,6 +161,7 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
   const screenHeight = Dimensions.get('screen').height;
   const queryClient = useQueryClient();
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [showUserTasks, setShowUserTasks] = useState(false);
 
   const resetPositionAnim = Animated.timing(panY, {
     toValue: 0,
@@ -303,8 +313,10 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
     const matchesCategory = !categoryFilter || 
       Object.entries(task.categoryXp)
         .some(([category, xp]) => category === categoryFilter && xp > 0);
+
+    const matchesUserFilter = showUserTasks ? task.type === 'user-generated' : !showUserTasks;
     
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesUserFilter;
   });
 
   const renderTaskItem = ({ item }: { item: Task }) => (
@@ -422,19 +434,51 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
                   style={[
                     staticStyles.categoryChip,
                     { 
-                      backgroundColor: !categoryFilter ? colors.secondary : 'transparent',
+                      backgroundColor: !categoryFilter && !showUserTasks ? colors.secondary : 'transparent',
                       borderWidth: 1,
                       borderColor: colors.primary
                     }
                   ]}
-                  onPress={() => setCategoryFilter(null)}
+                  onPress={() => {
+                    setCategoryFilter(null);
+                    setShowUserTasks(false);
+                  }}
                 >
                   <Text style={[staticStyles.categoryChipText, { 
-                    color: !categoryFilter ? colors.primary : colors.secondary
+                    color: !categoryFilter && !showUserTasks ? colors.primary : colors.secondary
                   }]}>
                     All
                   </Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    staticStyles.categoryChip,
+                    { 
+                      backgroundColor: showUserTasks ? colors.secondary : 'transparent',
+                      borderWidth: 1,
+                      borderColor: colors.primary
+                    }
+                  ]}
+                  onPress={() => {
+                    setShowUserTasks(!showUserTasks);
+                    setCategoryFilter(null);
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <FontAwesome5 
+                      name="user-edit" 
+                      size={12} 
+                      color={showUserTasks ? colors.primary : colors.secondary} 
+                    />
+                    <Text style={[staticStyles.categoryChipText, { 
+                      color: showUserTasks ? colors.primary : colors.secondary
+                    }]}>
+                      My Created Tasks
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
                 {['physical', 'mental', 'intellectual', 'spiritual', 'career', 'relationships', 'financial'].map(category => (
                   <TouchableOpacity
                     key={category}
