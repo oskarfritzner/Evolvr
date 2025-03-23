@@ -21,10 +21,16 @@ import { ChatModal } from '@/components/chat';
 interface Props {
   visible: boolean;
   onClose: () => void;
-  type: 'active' | 'routine';
+  type: 'active' | 'routine' | 'habit';
   mode?: 'create' | 'edit';
   onTaskAdded?: (task?: Task) => void;
+  selectedTaskId?: string;
+  title?: string;
+  description?: string;
+  filterPredicate?: (task: Task) => boolean;
 }
+
+const COMMON_HABIT_TITLES = ["Quit Addiction", "Meditate", "Journal entry"];
 
 // Static styles outside component
 const staticStyles = StyleSheet.create({
@@ -142,9 +148,39 @@ const staticStyles = StyleSheet.create({
     minWidth: 80,
     alignItems: 'center',
   },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  description: {
+    fontSize: 14,
+    marginBottom: 16,
+  },
 });
 
-const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded }) => {
+const getContextSpecificTitle = (type: 'active' | 'routine' | 'habit') => {
+  switch (type) {
+    case 'habit':
+      return 'Select Habit Task';
+    case 'routine':
+      return 'Add Task to Routine';
+    default:
+      return 'Add Task';
+  }
+};
+
+const getContextSpecificDescription = (type: 'active' | 'routine' | 'habit') => {
+  switch (type) {
+    case 'habit':
+      return 'Choose a task to turn into a habit. This will be your daily goal for the next 66 days.';
+    case 'routine':
+      return 'Add tasks to your routine. You can set specific days for each task later.';
+    default:
+      return 'Add a task to your active tasks list.';
+  }
+};
+
+const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, selectedTaskId, title, description, filterPredicate }) => {
   const { colors } = useTheme();
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -213,9 +249,27 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
   const loadTasks = async () => {
     setLoading(true);
     try {
-      const fetchedTasks = selectedCategory 
-        ? await taskService.getTasksByCategory(selectedCategory)
-        : await taskService.getAllTasks(); 
+      let fetchedTasks: Task[] = [];
+      
+      if (selectedCategory) {
+        fetchedTasks = await taskService.getTasksByCategory(selectedCategory);
+      } else {
+        // Get both system tasks and user-generated tasks
+        fetchedTasks = await taskService.getAllTasks();
+      }
+
+      // For habits, ensure we include both habit-specific tasks and regular tasks
+      if (type === 'habit') {
+        fetchedTasks = fetchedTasks.filter(task => 
+          task.type === 'habit' || 
+          COMMON_HABIT_TITLES.includes(task.title) ||
+          // Include regular tasks and user-generated tasks that can be turned into habits
+          task.type === 'user-generated' ||
+          !task.type || 
+          task.type === 'normal'
+        );
+      }
+
       setTasks(fetchedTasks);
     } catch (error) {
       console.error('Error loading tasks:', error);
@@ -268,13 +322,26 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
     if (!user?.uid) return;
     
     try {
-      await taskService.addTaskToActive(user.uid, taskId);
-      queryClient.invalidateQueries({ queryKey: ["activeTasks", user.uid] });
-      showSuccessMessage('Task added to your active tasks!');
+      // Find the task in our filtered list
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      if (type === 'habit') {
+        // For habits, just pass the task back to the parent
+        if (onTaskAdded) {
+          onTaskAdded(task);
+        }
+        showSuccessMessage('Task selected for habit');
+      } else {
+        // For active tasks, add to active tasks list
+        await taskService.addTaskToActive(user.uid, taskId);
+        queryClient.invalidateQueries({ queryKey: ["activeTasks", user.uid] });
+        showSuccessMessage('Task added to your active tasks!');
+      }
       
       setTimeout(() => {
         onClose();
-        if (onTaskAdded) {
+        if (onTaskAdded && type !== 'habit') {
           onTaskAdded();
         }
       }, 1000);
@@ -314,15 +381,21 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
       Object.entries(task.categoryXp)
         .some(([category, xp]) => category === categoryFilter && xp > 0);
 
-    const matchesUserFilter = showUserTasks ? task.type === 'user-generated' : !showUserTasks;
+    // Show all tasks when showUserTasks is false, only show user-generated when true
+    const matchesUserFilter = showUserTasks ? task.type === 'user-generated' : true;
     
-    return matchesSearch && matchesCategory && matchesUserFilter;
+    // For habits, we've already filtered in loadTasks
+    const matchesType = type === 'habit' ? true : true;
+
+    const matchesPredicate = filterPredicate ? filterPredicate(task) : true;
+    
+    return matchesSearch && matchesCategory && matchesUserFilter && matchesType && matchesPredicate;
   });
 
   const renderTaskItem = ({ item }: { item: Task }) => (
     <LittleTask 
       task={item}
-      type={type}
+      type={type === 'habit' ? 'active' : type}
       selectedDays={type === 'routine' ? [0,1,2,3,4,5,6] : undefined}
       onAddPress={async (taskId) => {
         if (type === 'routine') {
@@ -385,6 +458,9 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
           </View>
 
           <View style={staticStyles.headerContainer}>
+            <Text style={[staticStyles.title, { color: colors.textPrimary }]}>
+              {title || getContextSpecificTitle(type)}
+            </Text>
             <TouchableOpacity
               style={[staticStyles.createTaskButton, { backgroundColor: colors.secondary }]}
               onPress={() => setIsChatOpen(true)}
@@ -403,6 +479,10 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
               <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
+
+          <Text style={[staticStyles.description, { color: colors.textSecondary }]}>
+            {description || getContextSpecificDescription(type)}
+          </Text>
 
           <SafeAreaView style={staticStyles.safeArea}>
             <TextInput

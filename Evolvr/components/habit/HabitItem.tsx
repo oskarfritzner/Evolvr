@@ -15,9 +15,10 @@ interface HabitItemProps {
   habit: Habit;
   onRefresh?: () => void;
   onDelete: () => void;
+  onComplete?: () => void;
 }
 
-export default function HabitItem({ habit, onRefresh, onDelete }: HabitItemProps) {
+export default function HabitItem({ habit, onRefresh, onDelete, onComplete }: HabitItemProps) {
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const queryClient = useQueryClient();
@@ -39,6 +40,35 @@ export default function HabitItem({ habit, onRefresh, onDelete }: HabitItemProps
       completed: false
     };
   });
+
+  const handleComplete = async () => {
+    if (!user?.uid || !habit.id || habit.completedToday) return;
+    
+    try {
+      await habitService.completeHabitTask(user.uid, habit.task.id);
+      
+      // Call the onComplete callback if provided
+      if (onComplete) {
+        onComplete();
+      }
+      
+      // Show success message
+      Toast.show({
+        type: 'success',
+        text1: 'Habit completed',
+        text2: `Keep up the great work! ${habit.streak + 1} day streak!`,
+        position: 'bottom'
+      });
+    } catch (error) {
+      console.error('Error completing habit:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error instanceof Error ? error.message : 'Failed to complete habit',
+        position: 'bottom'
+      });
+    }
+  };
 
   const handleDelete = async () => {
     if (!user?.uid || !habit.id) return;
@@ -66,7 +96,7 @@ export default function HabitItem({ habit, onRefresh, onDelete }: HabitItemProps
               {habit.title}
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-              {habit.title}
+              {habit.reason}
             </Text>
           </View>
 
@@ -77,9 +107,20 @@ export default function HabitItem({ habit, onRefresh, onDelete }: HabitItemProps
               </Text>
             </View>
             
-            <View style={[styles.statusDot, { 
-              backgroundColor: habit.completedToday ? colors.secondary : colors.border 
-            }]} />
+            <TouchableOpacity
+              onPress={handleComplete}
+              disabled={habit.completedToday}
+              style={styles.statusDotContainer}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <View style={[
+                styles.statusDot, 
+                { 
+                  backgroundColor: habit.completedToday ? colors.success : 'transparent',
+                  borderColor: habit.completedToday ? colors.success : colors.border,
+                }
+              ]} />
+            </TouchableOpacity>
             
             <TouchableOpacity
               onPress={handleDelete}
@@ -189,10 +230,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  statusDotContainer: {
+    padding: 4,
+  },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
   },
   deleteButton: {
     padding: 4,

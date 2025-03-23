@@ -390,6 +390,24 @@ const CreateRoutine: React.FC<Props> = ({ visible, onClose, routine }) => {
     }
   };
 
+  const handleTaskAdded = (task: Task) => {
+    if (!task) return;
+    
+    const routineTask: RoutineTask = {
+      ...task,
+      routineId: routine?.id || '',
+      routineName: currentRoutine.name,
+      frequency: 'weekly',
+      order: currentRoutine.tasks.length,
+      participants: routine?.participants || [user?.uid || ''],
+      days: [0,1,2,3,4,5,6], // Default to all days, can be modified later
+      createdAt: Timestamp.now(),
+      active: true,
+    };
+
+    updateRoutineTasks([...currentRoutine.tasks, routineTask]);
+  };
+
   // 8. Render content based on current view
   const renderContent = () => {
     switch (currentView) {
@@ -402,21 +420,12 @@ const CreateRoutine: React.FC<Props> = ({ visible, onClose, routine }) => {
               type="routine"
               onTaskAdded={(task) => {
                 if (task) {
-                  const routineTask: RoutineTask = {
-                    ...task,
-                    routineId: '',
-                    routineName: currentRoutine.name,
-                    frequency: 'weekly',
-                    order: currentRoutine.tasks.length,
-                    participants: [user?.uid || ''],
-                    days: [0,1,2,3,4,5,6],
-                    createdAt: Timestamp.now(),
-                    active: true,
-                  };
-                  updateRoutineTasks([...currentRoutine.tasks, routineTask]);
+                  handleTaskAdded(task);
                 }
                 setCurrentView('main');
               }}
+              title="Add Task to Routine"
+              description="Select tasks to add to your routine. You can set specific days for each task later."
             />
           </View>
         );

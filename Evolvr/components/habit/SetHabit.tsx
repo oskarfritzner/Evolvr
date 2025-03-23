@@ -19,7 +19,7 @@ import { useHabits } from '@/hooks/queries/useHabits';
 import { taskService } from '@/backend/services/taskService';
 import type Task from '@/backend/types/Task';
 import { categories } from '../../constants/categories';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { TaskStatus } from '@/backend/types/Task';
 import { Timestamp } from "firebase/firestore";
 import { generateId } from '@/utils/generateId';
@@ -27,6 +27,7 @@ import InfoModal from '@/components/shared/InfoModal';
 import { INFO_CONTENT } from '@/constants/infoContent';
 import Toast from 'react-native-toast-message';
 import { useQueryClient } from '@tanstack/react-query';
+import AddTask from '@/components/tasks/addTask';
 
 interface SetHabitProps {
   visible: boolean;
@@ -216,6 +217,73 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: Platform.OS === 'ios' ? 100 : 80,
   },
+  selectedTaskContainer: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  selectedTaskTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  changeTaskButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    alignItems: 'center',
+  },
+  changeTaskText: {
+    fontSize: 14,
+  },
+  selectTaskButton: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  selectTaskText: {
+    fontSize: 14,
+  },
+  selectedTaskDescription: {
+    fontSize: 14,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  taskHeader: {
+    gap: 12,
+  },
+  taskTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  taskMetadata: {
+    marginTop: 8,
+    gap: 8,
+  },
+  metadataItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metadataText: {
+    fontSize: 12,
+  },
+  xpContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  xpBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  xpText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
 });
 
 const HabitInfoModal = ({ visible, onClose, colors }: { 
@@ -318,108 +386,47 @@ export default function SetHabit({ visible, onClose, onHabitCreated }: SetHabitP
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [description, setDescription] = useState('');
-  const [selectedTaskId, setSelectedTaskId] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [validationMessage, setValidationMessage] = useState<string>('');
-  const [showHabitInfo, setShowHabitInfo] = useState(false);
-  const { width: windowWidth } = useWindowDimensions();
-  const isDesktop = windowWidth >= 768; // Breakpoint for desktop
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { createHabit } = useHabits(user?.uid);
-  const [availableTasks, setAvailableTasks] = useState<Task[]>([]);
-
-  useEffect(() => {
-    const loadTasks = async () => {
-      if (!user?.uid) return;
-      try {
-        const tasks = await taskService.getAllTasks();
-        setAvailableTasks(tasks);
-      } catch (error) {
-        console.error('Error loading tasks:', error);
-      }
-    };
-
-    loadTasks();
-  }, [user]);
-
-  const filteredTasks = useMemo(() => {
-    return availableTasks
-      .filter(task => {
-        // If there's a search query, only filter by search
-        if (searchQuery) {
-          return task.title.toLowerCase().includes(searchQuery.toLowerCase());
-        }
-        
-        // If selectedCategory is null, show common habits
-        if (selectedCategory === null) {
-          return COMMON_HABIT_TITLES.includes(task.title);
-        }
-        
-        // If selectedCategory is undefined, show all tasks
-        if (selectedCategory === undefined) {
-          return true;
-        }
-        
-        // Otherwise filter by selected category
-        const taskCategory = Object.keys(task.categoryXp)[0];
-        return taskCategory === selectedCategory;
-      })
-      .sort((a, b) => {
-        if (a.type === 'habit' && b.type !== 'habit') return -1;
-        if (a.type !== 'habit' && b.type === 'habit') return 1;
-        return 0;
-      })
-      .slice(0, 10);
-  }, [availableTasks, searchQuery, selectedCategory]);
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768; // Breakpoint for desktop
 
   useEffect(() => {
     if (!visible) {
       resetForm();
-      setSearchQuery('');
-      setSelectedCategory(null);
-      setValidationMessage('');
     }
   }, [visible]);
 
   const resetForm = () => {
     setDescription('');
-    setSelectedTaskId('');
-    setSearchQuery('');
-    setSelectedCategory(null);
+    setSelectedTask(null);
   };
-
-  const handleSearch = (text: string) => {
-    setSearchQuery(text);
-    if (text) {
-      setSelectedCategory(null);
-    }
-  };
-
-  useEffect(() => {
-    const message = getValidationMessage(description, selectedTaskId);
-    setValidationMessage(message);
-  }, [description, selectedTaskId]);
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
     
     if (!description) {
-      setValidationMessage('Please provide your motivation');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please provide your motivation'
+      });
       return;
     }
-    if (!selectedTaskId) {
-      setValidationMessage('Please select a task');
+    if (!selectedTask) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please select a task'
+      });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const selectedTask = filteredTasks.find(task => task.id === selectedTaskId);
-      if (!selectedTask) throw new Error('Task not found');
-
       const habitData = {
         title: selectedTask.title,
         reason: description,
@@ -429,7 +436,6 @@ export default function SetHabit({ visible, onClose, onHabitCreated }: SetHabitP
       const result = await createHabit(habitData);
       
       if (!result.success) {
-        // Handle the error case
         Toast.show({
           type: 'warning',
           text1: 'Cannot Create Habit',
@@ -440,7 +446,6 @@ export default function SetHabit({ visible, onClose, onHabitCreated }: SetHabitP
         return;
       }
 
-      // Success case
       resetForm();
       onClose();
 
@@ -456,7 +461,6 @@ export default function SetHabit({ visible, onClose, onHabitCreated }: SetHabitP
       }
 
     } catch (error) {
-      // Handle unexpected errors
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -473,6 +477,62 @@ export default function SetHabit({ visible, onClose, onHabitCreated }: SetHabitP
       onSurfaceVariant: colors.textSecondary,
       background: colors.background,
     }
+  };
+
+  const renderSelectedTask = () => {
+    if (!selectedTask) return null;
+
+    return (
+      <View style={[styles.selectedTaskContainer, { backgroundColor: colors.surface }]}>
+        <View style={styles.taskHeader}>
+          <View style={styles.taskTitleRow}>
+            <Text style={[styles.selectedTaskTitle, { color: colors.textPrimary }]}>
+              {selectedTask.title}
+            </Text>
+            <TouchableOpacity 
+              style={[styles.changeTaskButton, { borderColor: colors.border }]}
+              onPress={() => setShowAddTask(true)}
+            >
+              <Text style={[styles.changeTaskText, { color: colors.textSecondary }]}>
+                Change Task
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.selectedTaskDescription, { color: colors.textSecondary }]}>
+            {selectedTask.description}
+          </Text>
+
+          <View style={styles.taskMetadata}>
+            {/* Task Type */}
+            <View style={styles.metadataItem}>
+              <FontAwesome5 
+                name={selectedTask.type === 'user-generated' ? 'user-edit' : 'tasks'} 
+                size={12} 
+                color={colors.textSecondary} 
+              />
+              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
+                {selectedTask.type === 'user-generated' ? 'Custom Task' : 'System Task'}
+              </Text>
+            </View>
+
+            {/* XP Categories */}
+            <View style={styles.xpContainer}>
+              {Object.entries(selectedTask.categoryXp || {}).map(([category, xp]) => (
+                <View 
+                  key={category}
+                  style={[styles.xpBadge, { backgroundColor: colors.secondary + '20' }]}
+                >
+                  <Text style={[styles.xpText, { color: colors.secondary }]}>
+                    {category}: {xp}XP
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -519,14 +579,14 @@ export default function SetHabit({ visible, onClose, onHabitCreated }: SetHabitP
             <View style={isDesktop && styles.desktopLayout}>
               <View style={isDesktop && styles.desktopColumn}>
                 <View style={styles.inputContainer}>
-                  {!description && validationMessage.includes('description') && (
+                  {!description && getValidationMessage(description, selectedTask?.id || '') && (
                     <Text style={[{ 
                       color: colors.error,
                       fontSize: 12,
                       marginBottom: 4,
                       marginTop: -8,
                     }]}>
-                      Please provide your motivation
+                      {getValidationMessage(description, selectedTask?.id || '')}
                     </Text>
                   )}
                   <TextInput
@@ -558,98 +618,18 @@ export default function SetHabit({ visible, onClose, onHabitCreated }: SetHabitP
                   Select a Task
                 </Text>
                 <View style={styles.inputContainer}>
-                  {!selectedTaskId && validationMessage.includes('task') && (
-                    <Text style={[{ 
-                      color: colors.error,
-                      fontSize: 12,
-                      marginBottom: 4,
-                      marginTop: -8,
-                    }]}>
-                      Please select a task
-                    </Text>
-                  )}
-                  <TextInput
-                    label="Search Tasks"
-                    value={searchQuery}
-                    onChangeText={handleSearch}
-                    mode="outlined"
-                    style={styles.input}
-                    outlineColor={colors.border}
-                    activeOutlineColor={colors.primary}
-                    textColor={colors.textPrimary}
-                    theme={textInputTheme}
-                  />
-                </View>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.categoryScroll}
-                >
-                  <Chip
-                    selected={selectedCategory === null}
-                    onPress={() => setSelectedCategory(null)}
-                    style={[styles.categoryChip, { 
-                      backgroundColor: selectedCategory === null ? colors.primary : colors.surface 
-                    }]}
-                    textStyle={{ 
-                      color: selectedCategory === null ? colors.textPrimary : colors.textSecondary
-                    }}
-                  >
-                    Common Habits
-                  </Chip>
-                  {categories.map(category => (
-                    <Chip
-                      key={category.id}
-                      selected={selectedCategory === category.id}
-                      onPress={() => setSelectedCategory(category.id)}
-                      style={[styles.categoryChip, { 
-                        backgroundColor: selectedCategory === category.id ? colors.primary : colors.surface 
-                      }]}
-                      textStyle={{ 
-                        color: selectedCategory === category.id ? colors.textPrimary : colors.textSecondary
-                      }}
+                  {selectedTask ? (
+                    renderSelectedTask()
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.selectTaskButton, { backgroundColor: colors.surface }]}
+                      onPress={() => setShowAddTask(true)}
                     >
-                      {category.name}
-                    </Chip>
-                  ))}
-                </ScrollView>
-                <View style={[styles.tasksContainer, { 
-                  borderColor: colors.border,
-                  backgroundColor: colors.surface 
-                }]}>
-                  <ScrollView 
-                    style={styles.tasksScroll}
-                    showsVerticalScrollIndicator={true}
-                  >
-                    <RadioButton.Group onValueChange={value => setSelectedTaskId(value)} value={selectedTaskId}>
-                      {filteredTasks.map(task => (
-                        <TouchableOpacity
-                          key={task.id}
-                          style={[styles.taskItem, { 
-                            backgroundColor: selectedTaskId === task.id ? colors.secondary + '20' : 'transparent'
-                          }]}
-                          onPress={() => setSelectedTaskId(task.id)}
-                        >
-                          <RadioButton 
-                            value={task.id}
-                            color={colors.secondary}
-                            uncheckedColor={colors.border}
-                          />
-                          <Text style={[styles.taskText, { 
-                            color: colors.textPrimary,
-                            fontWeight: selectedTaskId === task.id ? 'bold' : 'normal'
-                          }]}>
-                            {task.title}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                      {filteredTasks.length === 0 && (
-                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                          No tasks found
-                        </Text>
-                      )}
-                    </RadioButton.Group>
-                  </ScrollView>
+                      <Text style={[styles.selectTaskText, { color: colors.textSecondary }]}>
+                        Select a task for your habit
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             </View>
@@ -660,7 +640,7 @@ export default function SetHabit({ visible, onClose, onHabitCreated }: SetHabitP
               mode="contained"
               onPress={handleSubmit}
               loading={isSubmitting}
-              disabled={!!validationMessage || isSubmitting}
+              disabled={!description || !selectedTask || isSubmitting}
               style={[styles.button, { backgroundColor: colors.secondary }]}
               textColor={colors.primary}
             >
@@ -669,11 +649,24 @@ export default function SetHabit({ visible, onClose, onHabitCreated }: SetHabitP
           </View>
         </View>
       </View>
+
       <InfoModal
         visible={showInfo}
         onClose={() => setShowInfo(false)}
         title={INFO_CONTENT.habit.title}
         content={INFO_CONTENT.habit.content}
+      />
+
+      <AddTask
+        visible={showAddTask}
+        onClose={() => setShowAddTask(false)}
+        type="habit"
+        onTaskAdded={(task) => {
+          if (task) {
+            setSelectedTask(task);
+          }
+          setShowAddTask(false);
+        }}
       />
     </Modal>
   );
