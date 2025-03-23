@@ -49,22 +49,7 @@ const staticStyles = StyleSheet.create({
     overflow: 'hidden',
     elevation: 5,
   },
-  dragIndicatorContainer: {
-    width: '100%',
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dragIndicator: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-  },
   closeButton: {
-    position: 'absolute',
-    top: 20,
-    right: 16,
-    zIndex: 1,
     padding: 8,
   },
   safeArea: {
@@ -116,21 +101,33 @@ const staticStyles = StyleSheet.create({
     textAlign: 'center',
   },
   headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 12,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  headerBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
   createTaskButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
+    paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
     gap: 6,
+    alignSelf: 'flex-start',
   },
   createTaskButtonText: {
     fontSize: 14,
@@ -148,13 +145,21 @@ const staticStyles = StyleSheet.create({
     minWidth: 80,
     alignItems: 'center',
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
   description: {
     fontSize: 14,
     marginBottom: 16,
+    paddingHorizontal: 16,
+    lineHeight: 20,
+  },
+  dragIndicatorContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  dragIndicator: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#ccc',
   },
 });
 
@@ -193,38 +198,42 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
   const { addTaskToRoutine } = useRoutine();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const panY = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
   const screenHeight = Dimensions.get('screen').height;
   const queryClient = useQueryClient();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showUserTasks, setShowUserTasks] = useState(false);
 
-  const resetPositionAnim = Animated.timing(panY, {
-    toValue: 0,
-    duration: 300,
-    useNativeDriver: true,
-  });
-
-  const closeAnim = Animated.timing(panY, {
-    toValue: screenHeight,
-    duration: 500,
-    useNativeDriver: true,
-  });
-
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 5; // Only respond to clear vertical drags
+      },
+      onPanResponderGrant: () => {
+        translateY.setValue(0);
+      },
       onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          panY.setValue(gestureState.dy);
+        if (gestureState.dy > 0) { // Only allow downward drag
+          translateY.setValue(gestureState.dy);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 100) {
-          closeAnim.start(onClose);
+          // If dragged down far enough, close the modal
+          Animated.timing(translateY, {
+            toValue: screenHeight,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => onClose());
         } else {
-          resetPositionAnim.start();
+          // Otherwise, snap back to original position
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            damping: 15,
+            mass: 1,
+          }).start();
         }
       },
     })
@@ -236,8 +245,8 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
 
   useEffect(() => {
     if (visible) {
-      panY.setValue(screenHeight); // Start from bottom
-      Animated.spring(panY, {
+      translateY.setValue(screenHeight); // Start from bottom
+      Animated.spring(translateY, {
         toValue: 0,
         useNativeDriver: true,
         damping: 20,
@@ -446,21 +455,39 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
       presentationStyle="overFullScreen"
     >
       <SafeAreaViewRN style={staticStyles.overlay}>
-        <View style={[staticStyles.modalContainer, { backgroundColor: colors.background }]}>
+        <Animated.View 
+          style={[
+            staticStyles.modalContainer, 
+            { 
+              backgroundColor: colors.background,
+              transform: [{ translateY }]
+            }
+          ]}
+        >
           <View {...panResponder.panHandlers} style={staticStyles.dragIndicatorContainer}>
             <View style={[staticStyles.dragIndicator, { backgroundColor: colors.border }]} />
           </View>
 
           <View style={staticStyles.headerContainer}>
-            <Text style={[staticStyles.title, { color: colors.textPrimary }]}>
-              {title || getContextSpecificTitle(type)}
-            </Text>
+            <View style={staticStyles.headerTop}>
+              <Text style={[staticStyles.title, { color: colors.textPrimary }]}>
+                {title || getContextSpecificTitle(type)}
+              </Text>
+              <TouchableOpacity 
+                style={staticStyles.closeButton} 
+                onPress={onClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
               style={[staticStyles.createTaskButton, { backgroundColor: colors.secondary }]}
               onPress={() => setIsChatOpen(true)}
@@ -469,14 +496,6 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
               <Text style={[staticStyles.createTaskButtonText, { color: colors.primary }]}>
                 Create Custom Task
               </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={staticStyles.closeButton} 
-              onPress={onClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -541,7 +560,7 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
                     }
                   ]}
                   onPress={() => {
-                    setShowUserTasks(!showUserTasks);
+                    setShowUserTasks(true);
                     setCategoryFilter(null);
                   }}
                 >
@@ -570,7 +589,10 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
                         borderColor: colors.primary
                       }
                     ]}
-                    onPress={() => setCategoryFilter(category === categoryFilter ? null : category)}
+                    onPress={() => {
+                      setCategoryFilter(category === categoryFilter ? null : category);
+                      setShowUserTasks(false);
+                    }}
                   >
                     <Text style={[staticStyles.categoryChipText, { 
                       color: categoryFilter === category ? colors.primary : colors.secondary
@@ -623,7 +645,7 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
             )}
             {errorMessage && <ErrorMessage message={errorMessage} fadeAnim={errorAnim} />}
           </SafeAreaView>
-        </View>
+        </Animated.View>
 
         <ChatModal
           visible={isChatOpen}

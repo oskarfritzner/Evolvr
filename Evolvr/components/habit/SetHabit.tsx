@@ -242,6 +242,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  selectTaskContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   selectTaskText: {
     fontSize: 14,
   },
@@ -625,9 +630,12 @@ export default function SetHabit({ visible, onClose, onHabitCreated }: SetHabitP
                       style={[styles.selectTaskButton, { backgroundColor: colors.surface }]}
                       onPress={() => setShowAddTask(true)}
                     >
-                      <Text style={[styles.selectTaskText, { color: colors.textSecondary }]}>
-                        Select a task for your habit
-                      </Text>
+                      <View style={styles.selectTaskContent}>
+                        <FontAwesome5 name="plus-circle" size={16} color={colors.textSecondary} />
+                        <Text style={[styles.selectTaskText, { color: colors.textSecondary }]}>
+                          Select a task for your habit
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   )}
                 </View>
