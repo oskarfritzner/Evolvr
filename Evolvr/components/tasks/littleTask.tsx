@@ -5,6 +5,7 @@ import { useTheme } from '@/context/ThemeContext';
 import type Task from '@/backend/types/Task';
 import { taskService } from '@/backend/services/taskService';
 import { useAuth } from '@/context/AuthContext';
+import { TaskType } from '@/backend/types/Task';
 
 interface LittleTaskProps {
   task: Task;
@@ -12,6 +13,21 @@ interface LittleTaskProps {
   onAddPress?: (taskId: string, days?: number[]) => Promise<void>;
   selectedDays?: number[];  // Only needed for routine tasks
 }
+
+const getTaskIcon = (taskType?: TaskType) => {
+  switch (taskType) {
+    case 'routine':
+      return 'calendar-check';
+    case 'habit':
+      return 'bolt';
+    case 'challenge':
+      return 'trophy';
+    case 'user-generated':
+      return 'user-edit';
+    default:
+      return 'tasks';
+  }
+};
 
 export default function LittleTask({ task, type, onAddPress, selectedDays }: LittleTaskProps) {
   const { user } = useAuth();
@@ -61,6 +77,17 @@ export default function LittleTask({ task, type, onAddPress, selectedDays }: Lit
             <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={expanded ? undefined : 1}>
               {task.title}
             </Text>
+            <View style={styles.sourceRow}>
+              <FontAwesome5 
+                name={getTaskIcon(task.type)} 
+                size={12} 
+                color={colors.textSecondary} 
+              />
+              <Text style={[styles.sourceText, { color: colors.textSecondary }]}>
+                {task.type === 'user-generated' || task.type === 'normal' ? '' : 
+                 (task.type && task.type.charAt(0).toUpperCase() + task.type.slice(1))}
+              </Text>
+            </View>
             <TouchableOpacity onPress={toggleExpand}>
               <FontAwesome5 
                 name={expanded ? 'chevron-up' : 'chevron-down'} 
@@ -70,7 +97,7 @@ export default function LittleTask({ task, type, onAddPress, selectedDays }: Lit
             </TouchableOpacity>
           </View>
           <View style={styles.xpRow}>
-            {Object.entries(task.categoryXp).map(([category, xp]) => (
+            {Object.entries(task.categoryXp || {}).map(([category, xp]) => (
               <View 
                 key={category}
                 style={[styles.xpBadge, { backgroundColor: colors.secondary + '20' }]}
@@ -162,6 +189,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
     marginRight: 8,
+  },
+  sourceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sourceText: {
+    fontSize: 13,
+    opacity: 0.8,
   },
   xpRow: {
     flexDirection: 'row',

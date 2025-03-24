@@ -1,6 +1,6 @@
 import { Routine } from "@/backend/types/Routine";
 import { CategoryLevel } from "@/backend/types/Level";
-import { CompletedTask } from "@/backend/types/Task";
+import { CompletedTask, TaskStatus } from "@/backend/types/Task";
 import { UserBadge } from "@/backend/types/Badge";
 import { Challenge } from "./Challenge";
 import { Timestamp } from "firebase/firestore";
@@ -107,6 +107,17 @@ export interface UserData {
   onboardingComplete: boolean;
   categories: Record<string, CategoryLevel>;
   activeTasks: string[];
+  userGeneratedTasks: {
+    id: string;
+    title: string;
+    description: string;
+    categories: string[];
+    categoryXp: Record<string, number>;
+    createdAt: Timestamp;
+    tags: string[];
+    completed: boolean;
+    status: TaskStatus;
+  }[];
   cachedRoutines?: CachedRoutine[];
   lastRoutineSync?: Timestamp;
   Challenges: string[]; // Array of challenge IDs

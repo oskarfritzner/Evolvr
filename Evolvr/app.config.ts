@@ -8,7 +8,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   userInterfaceStyle: "automatic",
-  scheme: "evolvr", // Your app's URL scheme
+  scheme: "evolvr",
+  extra: {
+    OPENAI_API_KEY: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
+    AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_API_KEY: process.env.AZURE_OPENAI_API_KEY,
+  }, // Your app's URL scheme
   plugins: [
     // ... other plugins
     "expo-secure-store",

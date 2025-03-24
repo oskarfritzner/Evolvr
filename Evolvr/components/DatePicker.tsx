@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Platform, TextInput, Modal, Pressable } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Platform, TextInput, Modal } from 'react-native'
 import { useTheme } from '@/context/ThemeContext'
 import { MaterialIcons } from '@expo/vector-icons'
 import DateTimePicker from '@react-native-community/datetimepicker'
-import { MotiView, AnimatePresence } from 'moti'
 
 interface CustomDatePickerProps {
   date: Date;
@@ -114,7 +113,7 @@ export default function CustomDatePicker({
     setTempDate(date)
   }, [date])
 
-  // Update validation when date changes from picker
+  // Update validation when date changes
   useEffect(() => {
     const isDateValid = date instanceof Date && !isNaN(date.getTime()) && validateDate(date);
     setIsValid(isDateValid);
@@ -125,54 +124,40 @@ export default function CustomDatePicker({
     }
   }, [date]);
 
-  // Handle native picker change
-  const handleDatePickerChange = (event: any, selectedDate?: Date) => {
-    const currentDate = selectedDate || tempDate;
-    
+  const handleDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
-      setShowPicker(false);
-    }
-    
-    if (event.type === 'set' && selectedDate) {
-      setTempDate(currentDate);
-      if (validateDate(currentDate)) {
-        onDateChange(currentDate);
-      } else {
-        setInputError('Date is outside allowed range');
+      setShowPicker(false)
+      if (event.type === 'set' && selectedDate) {
+        if (validateDate(selectedDate)) {
+          onDateChange(selectedDate)
+        } else {
+          setInputError('Date is outside allowed range')
+        }
+      }
+    } else {
+      if (selectedDate) {
+        setTempDate(selectedDate)
       }
     }
-  };
+  }
 
   const handleConfirm = () => {
     if (validateDate(tempDate)) {
-      onDateChange(tempDate);
-      setShowPicker(false);
+      onDateChange(tempDate)
+      setShowPicker(false)
     } else {
-      setInputError('Date is outside allowed range');
+      setInputError('Date is outside allowed range')
     }
-  };
+  }
 
   const handleCancel = () => {
-    setTempDate(date);
-    setShowPicker(false);
-  };
+    setTempDate(date)
+    setShowPicker(false)
+  }
 
   const styles = StyleSheet.create({
     container: {
       width: '100%',
-    },
-    labelContainer: {
-      flexDirection: 'row',
-      marginBottom: 6,
-    },
-    label: {
-      fontSize: 16,
-      color: colors.textPrimary,
-      fontWeight: '500',
-    },
-    required: {
-      color: colors.error,
-      marginLeft: 4,
     },
     inputRow: {
       flexDirection: 'row',
@@ -188,6 +173,7 @@ export default function CustomDatePicker({
       color: colors.textPrimary,
       borderWidth: 2,
       borderColor: isFocused ? colors.secondary : 'transparent',
+      flex: 1,
     },
     pickerButton: {
       padding: 15,
@@ -217,62 +203,6 @@ export default function CustomDatePicker({
       marginTop: 4,
       marginLeft: 5,
     },
-    modalOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'flex-end',
-    },
-    pickerContainer: {
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      padding: 20,
-      paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    },
-    pickerHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 20,
-    },
-    pickerTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: colors.textPrimary,
-    },
-    buttonRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: 20,
-    },
-    modalButton: {
-      padding: 10,
-      borderRadius: 8,
-      minWidth: 100,
-      alignItems: 'center',
-    },
-    confirmButton: {
-      backgroundColor: colors.secondary,
-    },
-    cancelButton: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    buttonText: {
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    confirmButtonText: {
-      color: colors.primary,
-    },
-    cancelButtonText: {
-      color: colors.textPrimary,
-    },
     webDateInput: Platform.select({
       web: {
         WebkitAppearance: 'none',
@@ -288,7 +218,42 @@ export default function CustomDatePicker({
         cursor: 'pointer',
       }
     }) as any,
-  })
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 12,
+      borderTopRightRadius: 12,
+      paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(0,0,0,0.1)',
+    },
+    headerButton: {
+      paddingHorizontal: 8,
+    },
+    headerButtonText: {
+      fontSize: 17,
+      fontWeight: '600',
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    pickerContainer: {
+      height: 216,
+      backgroundColor: colors.surface,
+    },
+  });
 
   return (
     <View style={styles.container}>
@@ -337,63 +302,62 @@ export default function CustomDatePicker({
               <MaterialIcons name="calendar-today" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
 
-            {showPicker && (
+            {Platform.OS === 'ios' ? (
               <Modal
                 transparent
                 visible={showPicker}
                 animationType="slide"
                 onRequestClose={handleCancel}
               >
-                <Pressable
-                  style={styles.modalOverlay}
-                  onPress={handleCancel}
-                >
-                  <Pressable>
-                    <MotiView
-                      from={{ translateY: 100, opacity: 0 }}
-                      animate={{ translateY: 0, opacity: 1 }}
-                      exit={{ translateY: 100, opacity: 0 }}
-                      transition={{ type: 'timing', duration: 300 }}
-                      style={styles.pickerContainer}
-                    >
-                      <View style={styles.pickerHeader}>
-                        <Text style={styles.pickerTitle}>
-                          Select {label}
+                <View style={styles.modalOverlay}>
+                  <View style={styles.modalContent}>
+                    <View style={styles.header}>
+                      <TouchableOpacity 
+                        style={styles.headerButton} 
+                        onPress={handleCancel}
+                      >
+                        <Text style={[styles.headerButtonText, { color: colors.textSecondary }]}>
+                          Cancel
                         </Text>
-                      </View>
-                      
+                      </TouchableOpacity>
+                      <Text style={styles.headerTitle}>Select {label}</Text>
+                      <TouchableOpacity 
+                        style={styles.headerButton} 
+                        onPress={handleConfirm}
+                      >
+                        <Text style={[styles.headerButtonText, { color: colors.secondary }]}>
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.pickerContainer}>
                       <DateTimePicker
                         testID="datePicker"
                         value={tempDate}
                         mode="date"
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                        onChange={handleDatePickerChange}
-                        style={{ backgroundColor: colors.surface }}
+                        display="spinner"
+                        onChange={handleDateChange}
                         minimumDate={minDate}
                         maximumDate={maxDate}
                         textColor={colors.textPrimary}
+                        style={{ backgroundColor: colors.surface }}
                       />
-
-                      {Platform.OS === 'ios' && (
-                        <View style={styles.buttonRow}>
-                          <TouchableOpacity
-                            style={[styles.modalButton, styles.cancelButton]}
-                            onPress={handleCancel}
-                          >
-                            <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.modalButton, styles.confirmButton]}
-                            onPress={handleConfirm}
-                          >
-                            <Text style={[styles.buttonText, styles.confirmButtonText]}>Confirm</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </MotiView>
-                  </Pressable>
-                </Pressable>
+                    </View>
+                  </View>
+                </View>
               </Modal>
+            ) : (
+              showPicker && (
+                <DateTimePicker
+                  testID="datePicker"
+                  value={date}
+                  mode="date"
+                  display="default"
+                  onChange={handleDateChange}
+                  minimumDate={minDate}
+                  maximumDate={maxDate}
+                />
+              )
             )}
           </>
         )}
@@ -409,5 +373,5 @@ export default function CustomDatePicker({
         <Text style={styles.errorText}>{error || inputError}</Text>
       )}
     </View>
-  )
+  );
 } 

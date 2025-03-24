@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -11,7 +11,8 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ScrollView,
-  Alert
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { MotiView } from 'moti';
@@ -19,6 +20,8 @@ import DatePicker from '@/components/DatePicker';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { usernameService } from '@/backend/services/usernameService';
+import debounce from 'lodash/debounce';
 
 interface ProfileSlideProps {
   profile: {
@@ -77,8 +80,59 @@ const resizeImage = (file: File): Promise<string> => {
 
 export function ProfileSlide({ profile, onChange }: ProfileSlideProps) {
   const { colors } = useTheme();
-  const [isPickerVisible, setIsPickerVisible] = useState(false);
   const isWeb = Platform.OS === 'web';
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [isUsernameValid, setIsUsernameValid] = useState(false);
+
+  // Debounced username validation
+  const validateUsername = useCallback(
+    debounce(async (username: string) => {
+      if (!username) {
+        setUsernameError(null);
+        setIsUsernameValid(false);
+        return;
+      }
+
+      setIsCheckingUsername(true);
+      try {
+        // First check format
+        const validation = usernameService.validateUsername(username);
+        if (!validation.isValid) {
+          setUsernameError(validation.error || 'Invalid username format');
+          setIsUsernameValid(false);
+          return;
+        }
+
+        // Then check availability
+        const isAvailable = await usernameService.isUsernameAvailable(username);
+        if (!isAvailable) {
+          setUsernameError('Username is already taken');
+          setIsUsernameValid(false);
+        } else {
+          setUsernameError(null);
+          setIsUsernameValid(true);
+        }
+      } catch (error) {
+        console.error('Error checking username:', error);
+        setUsernameError('Error checking username availability');
+        setIsUsernameValid(false);
+      } finally {
+        setIsCheckingUsername(false);
+      }
+    }, 500),
+    []
+  );
+
+  // Validate username when it changes
+  useEffect(() => {
+    if (profile.username) {
+      validateUsername(profile.username);
+    } else {
+      setUsernameError(null);
+      setIsUsernameValid(false);
+    }
+  }, [profile.username]);
 
   const handleImageSelection = () => {
     if (Platform.OS === 'web') {
@@ -214,22 +268,45 @@ export function ProfileSlide({ profile, onChange }: ProfileSlideProps) {
             </View>
 
             <View style={styles.inputContainer}>
-              <TextInput
-                style={[
-                  styles.input,
-                  { 
-                    color: colors.textPrimary,
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface
-                  }
-                ]}
-                placeholder="Username"
-                placeholderTextColor={colors.textSecondary}
-                value={profile.username}
-                onChangeText={(text) => onChange({ ...profile, username: text })}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              <View style={styles.usernameContainer}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { 
+                      color: colors.textPrimary,
+                      borderColor: usernameError ? colors.error : isUsernameValid ? colors.success : colors.border,
+                      backgroundColor: colors.surface
+                    }
+                  ]}
+                  placeholder="Username"
+                  placeholderTextColor={colors.textSecondary}
+                  value={profile.username}
+                  onChangeText={(text) => {
+                    onChange({ ...profile, username: text });
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {isCheckingUsername && (
+                  <ActivityIndicator 
+                    style={styles.usernameIndicator} 
+                    color={colors.textSecondary}
+                  />
+                )}
+                {isUsernameValid && !isCheckingUsername && (
+                  <MaterialIcons 
+                    name="check-circle" 
+                    size={24} 
+                    color={colors.success}
+                    style={styles.usernameIndicator}
+                  />
+                )}
+              </View>
+              {usernameError && (
+                <Text style={[styles.errorText, { color: colors.error }]}>
+                  {usernameError}
+                </Text>
+              )}
 
               <TextInput
                 style={[
@@ -250,15 +327,14 @@ export function ProfileSlide({ profile, onChange }: ProfileSlideProps) {
               />
             </View>
             <DatePicker
-            date={profile.birthDate}
-            onDateChange={(date: Date) => {
-              onChange({ ...profile, birthDate: date });
-              setIsPickerVisible(false);
-            }}
-            maxDate={new Date()}
-            minDate={new Date(1900, 0, 1)}
-            label="Birth Date"
-          />
+              date={profile.birthDate}
+              onDateChange={(date: Date) => {
+                onChange({ ...profile, birthDate: date });
+              }}
+              maxDate={new Date()}
+              minDate={new Date(1900, 0, 1)}
+              label="Birth Date"
+            />
           </MotiView>
         </ScrollView>
       </TouchableWithoutFeedback>
@@ -315,12 +391,28 @@ const styles = StyleSheet.create({
     gap: 16,
     marginBottom: 24,
   },
+  usernameContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  usernameIndicator: {
+    position: 'absolute',
+    right: 16,
+  },
+  errorText: {
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
   input: {
     width: '100%',
     height: 50,
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 16,
+    paddingRight: 48, // Make room for the indicator
     fontSize: 16,
   },
   bioInput: {

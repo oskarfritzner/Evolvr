@@ -16,14 +16,21 @@ import { Platform } from 'react-native';
 import { RoutineTask } from '@/backend/types/Routine';
 import { useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
+import { ChatModal } from '@/components/chat';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  type: 'active' | 'routine';
+  type: 'active' | 'routine' | 'habit';
   mode?: 'create' | 'edit';
   onTaskAdded?: (task?: Task) => void;
+  selectedTaskId?: string;
+  title?: string;
+  description?: string;
+  filterPredicate?: (task: Task) => boolean;
 }
+
+const COMMON_HABIT_TITLES = ["Quit Addiction", "Meditate", "Journal entry"];
 
 // Static styles outside component
 const staticStyles = StyleSheet.create({
@@ -42,22 +49,7 @@ const staticStyles = StyleSheet.create({
     overflow: 'hidden',
     elevation: 5,
   },
-  dragIndicatorContainer: {
-    width: '100%',
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dragIndicator: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-  },
   closeButton: {
-    position: 'absolute',
-    top: 20,
-    right: 16,
-    zIndex: 1,
     padding: 8,
   },
   safeArea: {
@@ -108,9 +100,92 @@ const staticStyles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
+  headerContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  headerBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  createTaskButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  createTaskButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  buttonIcon: {
+    marginRight: 2,
+  },
+  myTasksChip: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  description: {
+    fontSize: 14,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    lineHeight: 20,
+  },
+  dragIndicatorContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  dragIndicator: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#ccc',
+  },
 });
 
-const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded }) => {
+const getContextSpecificTitle = (type: 'active' | 'routine' | 'habit') => {
+  switch (type) {
+    case 'habit':
+      return 'Select Habit Task';
+    case 'routine':
+      return 'Add Task to Routine';
+    default:
+      return 'Add Task';
+  }
+};
+
+const getContextSpecificDescription = (type: 'active' | 'routine' | 'habit') => {
+  switch (type) {
+    case 'habit':
+      return 'Choose a task to turn into a habit. This will be your daily goal for the next 66 days.';
+    case 'routine':
+      return 'Add tasks to your routine. You can set specific days for each task later.';
+    default:
+      return 'Add a task to your active tasks list.';
+  }
+};
+
+const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, selectedTaskId, title, description, filterPredicate }) => {
   const { colors } = useTheme();
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -123,36 +198,42 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
   const { addTaskToRoutine } = useRoutine();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const panY = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
   const screenHeight = Dimensions.get('screen').height;
   const queryClient = useQueryClient();
-
-  const resetPositionAnim = Animated.timing(panY, {
-    toValue: 0,
-    duration: 300,
-    useNativeDriver: true,
-  });
-
-  const closeAnim = Animated.timing(panY, {
-    toValue: screenHeight,
-    duration: 500,
-    useNativeDriver: true,
-  });
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [showUserTasks, setShowUserTasks] = useState(false);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 5; // Only respond to clear vertical drags
+      },
+      onPanResponderGrant: () => {
+        translateY.setValue(0);
+      },
       onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          panY.setValue(gestureState.dy);
+        if (gestureState.dy > 0) { // Only allow downward drag
+          translateY.setValue(gestureState.dy);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 100) {
-          closeAnim.start(onClose);
+          // If dragged down far enough, close the modal
+          Animated.timing(translateY, {
+            toValue: screenHeight,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => onClose());
         } else {
-          resetPositionAnim.start();
+          // Otherwise, snap back to original position
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            damping: 15,
+            mass: 1,
+          }).start();
         }
       },
     })
@@ -164,8 +245,8 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
 
   useEffect(() => {
     if (visible) {
-      panY.setValue(screenHeight); // Start from bottom
-      Animated.spring(panY, {
+      translateY.setValue(screenHeight); // Start from bottom
+      Animated.spring(translateY, {
         toValue: 0,
         useNativeDriver: true,
         damping: 20,
@@ -177,9 +258,27 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
   const loadTasks = async () => {
     setLoading(true);
     try {
-      const fetchedTasks = selectedCategory 
-        ? await taskService.getTasksByCategory(selectedCategory)
-        : await taskService.getAllTasks(); 
+      let fetchedTasks: Task[] = [];
+      
+      if (selectedCategory) {
+        fetchedTasks = await taskService.getTasksByCategory(selectedCategory);
+      } else {
+        // Get both system tasks and user-generated tasks
+        fetchedTasks = await taskService.getAllTasks();
+      }
+
+      // For habits, ensure we include both habit-specific tasks and regular tasks
+      if (type === 'habit') {
+        fetchedTasks = fetchedTasks.filter(task => 
+          task.type === 'habit' || 
+          COMMON_HABIT_TITLES.includes(task.title) ||
+          // Include regular tasks and user-generated tasks that can be turned into habits
+          task.type === 'user-generated' ||
+          !task.type || 
+          task.type === 'normal'
+        );
+      }
+
       setTasks(fetchedTasks);
     } catch (error) {
       console.error('Error loading tasks:', error);
@@ -232,13 +331,26 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
     if (!user?.uid) return;
     
     try {
-      await taskService.addTaskToActive(user.uid, taskId);
-      queryClient.invalidateQueries({ queryKey: ["activeTasks", user.uid] });
-      showSuccessMessage('Task added to your active tasks!');
+      // Find the task in our filtered list
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      if (type === 'habit') {
+        // For habits, just pass the task back to the parent
+        if (onTaskAdded) {
+          onTaskAdded(task);
+        }
+        showSuccessMessage('Task selected for habit');
+      } else {
+        // For active tasks, add to active tasks list
+        await taskService.addTaskToActive(user.uid, taskId);
+        queryClient.invalidateQueries({ queryKey: ["activeTasks", user.uid] });
+        showSuccessMessage('Task added to your active tasks!');
+      }
       
       setTimeout(() => {
         onClose();
-        if (onTaskAdded) {
+        if (onTaskAdded && type !== 'habit') {
           onTaskAdded();
         }
       }, 1000);
@@ -277,14 +389,22 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
     const matchesCategory = !categoryFilter || 
       Object.entries(task.categoryXp)
         .some(([category, xp]) => category === categoryFilter && xp > 0);
+
+    // Show all tasks when showUserTasks is false, only show user-generated when true
+    const matchesUserFilter = showUserTasks ? task.type === 'user-generated' : true;
     
-    return matchesSearch && matchesCategory;
+    // For habits, we've already filtered in loadTasks
+    const matchesType = type === 'habit' ? true : true;
+
+    const matchesPredicate = filterPredicate ? filterPredicate(task) : true;
+    
+    return matchesSearch && matchesCategory && matchesUserFilter && matchesType && matchesPredicate;
   });
 
   const renderTaskItem = ({ item }: { item: Task }) => (
     <LittleTask 
       task={item}
-      type={type}
+      type={type === 'habit' ? 'active' : type}
       selectedDays={type === 'routine' ? [0,1,2,3,4,5,6] : undefined}
       onAddPress={async (taskId) => {
         if (type === 'routine') {
@@ -335,28 +455,53 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
       presentationStyle="overFullScreen"
     >
       <SafeAreaViewRN style={staticStyles.overlay}>
-        <View style={[staticStyles.modalContainer, { backgroundColor: colors.background }]}>
+        <Animated.View 
+          style={[
+            staticStyles.modalContainer, 
+            { 
+              backgroundColor: colors.background,
+              transform: [{ translateY }]
+            }
+          ]}
+        >
           <View {...panResponder.panHandlers} style={staticStyles.dragIndicatorContainer}>
             <View style={[staticStyles.dragIndicator, { backgroundColor: colors.border }]} />
           </View>
 
-          <TouchableOpacity 
-            style={staticStyles.closeButton} 
-            onPress={onClose}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons 
-              name="close" 
-              size={24} 
-              color={colors.textSecondary} 
-            />
-          </TouchableOpacity>
+          <View style={staticStyles.headerContainer}>
+            <View style={staticStyles.headerTop}>
+              <Text style={[staticStyles.title, { color: colors.textPrimary }]}>
+                {title || getContextSpecificTitle(type)}
+              </Text>
+              <TouchableOpacity 
+                style={staticStyles.closeButton} 
+                onPress={onClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[staticStyles.createTaskButton, { backgroundColor: colors.secondary }]}
+              onPress={() => setIsChatOpen(true)}
+            >
+              <FontAwesome5 name="magic" size={14} color={colors.primary} style={staticStyles.buttonIcon} />
+              <Text style={[staticStyles.createTaskButtonText, { color: colors.primary }]}>
+                Create Custom Task
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[staticStyles.description, { color: colors.textSecondary }]}>
+            {description || getContextSpecificDescription(type)}
+          </Text>
 
           <SafeAreaView style={staticStyles.safeArea}>
             <TextInput
@@ -388,19 +533,51 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
                   style={[
                     staticStyles.categoryChip,
                     { 
-                      backgroundColor: !categoryFilter ? colors.secondary : 'transparent',
+                      backgroundColor: !categoryFilter && !showUserTasks ? colors.secondary : 'transparent',
                       borderWidth: 1,
                       borderColor: colors.primary
                     }
                   ]}
-                  onPress={() => setCategoryFilter(null)}
+                  onPress={() => {
+                    setCategoryFilter(null);
+                    setShowUserTasks(false);
+                  }}
                 >
                   <Text style={[staticStyles.categoryChipText, { 
-                    color: !categoryFilter ? colors.primary : colors.secondary
+                    color: !categoryFilter && !showUserTasks ? colors.primary : colors.secondary
                   }]}>
                     All
                   </Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    staticStyles.categoryChip,
+                    { 
+                      backgroundColor: showUserTasks ? colors.secondary : 'transparent',
+                      borderWidth: 1,
+                      borderColor: colors.primary
+                    }
+                  ]}
+                  onPress={() => {
+                    setShowUserTasks(true);
+                    setCategoryFilter(null);
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <FontAwesome5 
+                      name="user-edit" 
+                      size={12} 
+                      color={showUserTasks ? colors.primary : colors.secondary} 
+                    />
+                    <Text style={[staticStyles.categoryChipText, { 
+                      color: showUserTasks ? colors.primary : colors.secondary
+                    }]}>
+                      My Created Tasks
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
                 {['physical', 'mental', 'intellectual', 'spiritual', 'career', 'relationships', 'financial'].map(category => (
                   <TouchableOpacity
                     key={category}
@@ -412,7 +589,10 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
                         borderColor: colors.primary
                       }
                     ]}
-                    onPress={() => setCategoryFilter(category === categoryFilter ? null : category)}
+                    onPress={() => {
+                      setCategoryFilter(category === categoryFilter ? null : category);
+                      setShowUserTasks(false);
+                    }}
                   >
                     <Text style={[staticStyles.categoryChipText, { 
                       color: categoryFilter === category ? colors.primary : colors.secondary
@@ -465,7 +645,16 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded })
             )}
             {errorMessage && <ErrorMessage message={errorMessage} fadeAnim={errorAnim} />}
           </SafeAreaView>
-        </View>
+        </Animated.View>
+
+        <ChatModal
+          visible={isChatOpen}
+          onClose={() => {
+            setIsChatOpen(false);
+            loadTasks(); // Reload tasks to show any new ones
+          }}
+          mode="taskCreator"
+        />
       </SafeAreaViewRN>
     </Modal>
   );

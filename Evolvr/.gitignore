@@ -39,3 +39,6 @@ app-example
 
 # .env
 .env
+
+#firebase.rules
+firebase.rules
