@@ -215,35 +215,6 @@ EvolvrApp/
 └── README.md         # Project documentation
 ```
 
-## 🧪 Testing
-
-Run the test suite:
-
-```bash
-npm test
-# or
-yarn test
-```
-
-## 📱 Building for Production
-
-1. **Configure app.json**
-   Update the necessary fields in `app.json` for your production build.
-
-2. **Build for iOS**
-
-   ```bash
-   eas build --platform ios
-   ```
-
-## 📄 Available Scripts
-
-- `npm start` - Start the Expo development server
-- `npm run ios` - Run on iOS simulator using `expo run:ios`
-- `npm test` - Run tests with Jest in watch mode
-- `npm run lint` - Run ESLint
-- `npm run init-tasks` - Initialize tasks
-- `npm run reset-project` - Reset project configuration
 
 ## 🤝 Contributing
 
