@@ -4,7 +4,7 @@ import { Stack } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { Challenge, UserChallenge } from '@/backend/types/Challenge';
 import { challengeService } from '@/backend/services/challengeService';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/context/AuthContext';
 import ChallengeCard from '@/components/challenges/ChallengeCard';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';

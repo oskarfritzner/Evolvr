@@ -7,7 +7,7 @@ import { FontAwesome5, Ionicons } from "@expo/vector-icons";
 import PostGrid from "@/components/posts/PostGrid";
 import BadgesGrid from "@/components/BadgesGrid";
 import { useProfileData } from "@/hooks/queries/useProfileData";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import ErrorMessage from "@/components/errorHandlingMessages/errorMessage";
 import { useAuth } from "@/context/AuthContext";
 

@@ -7,7 +7,7 @@ import { UserData } from '@/backend/types/UserData';
 import { TaskType } from '@/backend/types/Task';
 import { RoutineTaskWithMeta, RoutineTask } from '@/backend/types/Routine';
 import { ParticipantData } from '@/backend/types/Participant';
-import { Avatar } from '@/components/Avatar';
+import { Avatar } from '@/components/ui/Avatar';
 import { MotiView } from 'moti';
 import { MotiPressable } from 'moti/interactions';
 import { Easing } from 'react-native-reanimated';
@@ -122,6 +122,7 @@ const ActiveTask: React.FC<ActiveTaskProps> = ({ task, onComplete, participants 
       habit: 'bolt',
       challenge: 'trophy',
       normal: 'tasks',
+      'user-generated': 'user',
     }[task.type || 'normal'];
 
     let sourceName = '';

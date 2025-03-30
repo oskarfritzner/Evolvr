@@ -7,7 +7,7 @@ import { challengeService } from '@/backend/services/challengeService';
 import { taskService } from '@/backend/services/taskService';
 import { Button } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type Task from '@/backend/types/Task';
 import Toast from 'react-native-toast-message';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
@@ -302,6 +302,7 @@ export default function ChallengeModal() {
                 mode="contained"
                 onPress={handleQuitChallenge}
                 style={[styles.button, { backgroundColor: colors.error }]}
+                labelStyle={{ fontSize: 16, fontWeight: '600', letterSpacing: 0.5 }}
               >
                 Quit Challenge
               </Button>
@@ -309,6 +310,7 @@ export default function ChallengeModal() {
                 mode="contained"
                 onPress={() => handleResetProgress(challenge?.id || '')}
                 style={[styles.button, { backgroundColor: colors.warning }]}
+                labelStyle={{ fontSize: 16, fontWeight: '600', letterSpacing: 0.5 }}
               >
                 Reset Progress
               </Button>
@@ -318,6 +320,7 @@ export default function ChallengeModal() {
               mode="contained"
               onPress={handleJoinChallenge}
               style={[styles.button, { backgroundColor: colors.secondary }]}
+              labelStyle={{ fontSize: 16, fontWeight: '600', letterSpacing: 0.5 }}
             >
               Start Challenge
             </Button>
@@ -438,7 +441,7 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 0 : 16,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.1)',
     width: '100%',
@@ -446,6 +449,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   buttonGroup: {
     flexDirection: 'row',
@@ -455,5 +463,14 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     marginBottom: Platform.OS === 'ios' ? 8 : 0,
+    height: 48,
+    borderRadius: 24,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

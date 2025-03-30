@@ -4,7 +4,7 @@ import { Modal, Portal } from 'react-native-paper';
 import { useTheme } from '@/context/ThemeContext';
 import { RoutineInviteNotification } from '@/backend/types/Notification';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import Toast from 'react-native-toast-message';
 import { notificationService } from '@/backend/services/notificationService';
 import { routineService } from '@/backend/services/routineServices';

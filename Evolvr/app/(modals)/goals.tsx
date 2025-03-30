@@ -8,7 +8,7 @@ import { Stack, router } from 'expo-router';
 import { Goal, GoalTimeframe } from '@/backend/types/Goal';
 import { goalService } from '@/backend/services/goalService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { GoalModal } from '@/components/goals/GoalModal';
 import { GoalSection } from '@/components/goals/GoalSection';
 import { FontAwesome5 } from '@expo/vector-icons';

@@ -4,7 +4,7 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { CategoryLevel } from '@/backend/types/Level';
 import { useTheme } from '@/context/ThemeContext';
 import { levelService } from '@/backend/services/levelService';
-import ProgressCircle from '../ProgressCircle';
+import ProgressCircle from '../../ProgressCircle';
 
 interface CategoryProgressCardProps {
   category: string;
@@ -94,8 +94,8 @@ const styles = StyleSheet.create({
     marginRight: 16,
     width: 180,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.6,
     shadowRadius: 4,
     elevation: 3,
   },

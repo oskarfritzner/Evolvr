@@ -1,32 +1,29 @@
 import React, { useState, useCallback } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
-import { Habit } from '@/backend/types/Habit';
 import HabitItem from './HabitItem';
 import { MotiView } from 'moti';
 import { useAuth } from '@/context/AuthContext';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
-import { FontAwesome5 } from '@expo/vector-icons';
 import { habitService } from '@/backend/services/habitService';
 import Toast from 'react-native-toast-message';
-import { useTheme } from '@/context/ThemeContext';
-import { router } from 'expo-router';
+import { Habit } from '@/backend/types/Habit';
 
-export default function HabitGrid() {
+interface HabitGridProps {
+  habits: Habit[];
+  onRefresh?: () => void;
+}
+
+export default function HabitGrid({ habits, onRefresh }: HabitGridProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   
-  const { data: habits = [], isLoading } = useQuery({
-    queryKey: ['habits', user?.uid],
-    queryFn: () => habitService.getUserHabits(user?.uid || ''),
-    enabled: !!user?.uid
-  });
-
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await queryClient.invalidateQueries({ queryKey: ['habits', user?.uid] });
+    if (onRefresh) onRefresh();
     setRefreshing(false);
-  }, [queryClient, user?.uid]);
+  }, [queryClient, user?.uid, onRefresh]);
 
   const handleHabitComplete = useCallback(async () => {
     if (!user?.uid) return;
@@ -66,10 +63,6 @@ export default function HabitGrid() {
     }
   }, [queryClient, user?.uid]);
 
-  if (isLoading) {
-    return <ActivityIndicator size="large" />;
-  }
-
   return (
     <ScrollView
       refreshControl={
@@ -98,7 +91,6 @@ export default function HabitGrid() {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
     gap: 16,
   },
 });

@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { userService } from '@/backend/services/userService';
-import { LoadingSpinner } from '../LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { levelService } from '@/backend/services/levelService';
 
 interface CategoryCardSliderProps {

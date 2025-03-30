@@ -20,8 +20,6 @@ import {
   limit,
   startAfter,
   QueryDocumentSnapshot,
-  startAt,
-  endAt,
 } from "firebase/firestore";
 import AddFriendBtn from "../friends/addFriendBtn";
 import { useAuth } from "@/context/AuthContext";
@@ -30,7 +28,6 @@ import { useTheme } from "@/context/ThemeContext";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { UserData } from "@/backend/types/UserData";
-import { postService } from "@/backend/services/postService";
 import { friendService } from "@/backend/services/friendService";
 import { Friend } from "@/backend/types/Friend";
 import { useFocusEffect } from "@react-navigation/native";

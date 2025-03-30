@@ -10,7 +10,7 @@ import { format, subDays, isAfter, isBefore, parseISO } from 'date-fns';
 import { Stack, router } from 'expo-router';
 import { Button, Surface, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 type JournalTypeInfo = {

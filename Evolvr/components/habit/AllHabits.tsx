@@ -5,7 +5,7 @@ import HabitGrid from './HabitGrid';
 import { useAuth } from '@/context/AuthContext';
 import { FontAwesome5 } from '@expo/vector-icons';
 import SetHabit from './SetHabit';
-import { LoadingSpinner } from '../LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useHabits } from '@/hooks/queries/useHabits';
 import { useQueryClient } from '@tanstack/react-query';
 

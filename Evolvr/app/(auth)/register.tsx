@@ -12,7 +12,6 @@ import {
 import { useTheme } from "@/context/ThemeContext"
 import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from "firebase/auth"
 import { useRouter } from "expo-router"
-import { LinearGradient } from "expo-linear-gradient"
 import { FontAwesome } from "@expo/vector-icons"
 import Toast from 'react-native-toast-message'
 import { useRegistration } from "@/hooks/auth/useRegistration"

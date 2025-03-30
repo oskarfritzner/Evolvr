@@ -181,6 +181,7 @@ export class AIService {
 
     this.client = new OpenAI({
       apiKey: key,
+      dangerouslyAllowBrowser: true, // Enable browser support
     });
   }
 
@@ -265,8 +266,7 @@ End with motivational closings like:
 - "Believe in yourself! 🌟 You're making choices that align with your growth!"
 - "You're doing great! 🚀 Keep building these positive habits!"
 - "This is your journey! ⭐ Every task you complete shapes your future!"
-- "Keep shining! ✨ Your dedication to self-improvement is inspiring!"
-`;
+- "Keep shining! ✨ Your dedication to self-improvement is inspiring!"`;
 
     try {
       await this.enforceRateLimit();

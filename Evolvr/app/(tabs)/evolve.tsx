@@ -3,7 +3,7 @@ import { View, StyleSheet, Platform } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import ActiveTasksList from "@/components/tasks/activeTasksList";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserData } from "@/hooks/queries/useUserData";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

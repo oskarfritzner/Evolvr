@@ -3,12 +3,9 @@ import { ActivityIndicator, View, Platform } from "react-native";
 import { onAuthStateChanged, User as FirebaseUser, signOut as firebaseSignOut, signInWithEmailAndPassword } from "firebase/auth";
 import { doc, onSnapshot, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/backend/config/firebase";
-import { levelService } from "@/backend/services/levelService";
 import { userService } from "@/backend/services/userService";
 import { UserData, UserType } from "@/backend/types/UserData";
-import { habitService } from "@/backend/services/habitService";
 import { router } from "expo-router";
-import * as SecureStore from 'expo-secure-store';
 import { routineService } from "@/backend/services/routineServices";
 import logger from '@/utils/logger';
 import { registrationService } from "@/backend/services/registrationService";
@@ -41,7 +38,7 @@ const AuthContext = createContext<AuthContextType>({
   isInitialized: false,
   signOut: async () => {},
   signIn: async () => { throw new Error("signIn method not implemented"); },
-  refreshUserData: async () => {},
+  refreshUserData: async () => { throw new Error("refreshUserData method not implemented"); },
 });
 
 // Loading spinner component

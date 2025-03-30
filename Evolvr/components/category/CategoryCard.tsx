@@ -2,7 +2,7 @@ import React from 'react'
 import { TouchableOpacity, Text, StyleSheet } from 'react-native'
 import { useTheme } from '@/context/ThemeContext'
 import { FontAwesome5 } from '@expo/vector-icons'
-import ProgressBar from './ProgressBar'
+import  ProgressBar  from '@/components/ProgressBar'
 import { levelService } from '@/backend/services/levelService'
 
 interface CategoryCardProps {

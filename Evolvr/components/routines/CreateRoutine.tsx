@@ -1,28 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView,
-  Modal, Animated, ActivityIndicator, Image, PanResponder, Platform,
-  Dimensions, useWindowDimensions
+  Modal, Animated, Platform, useWindowDimensions
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
 import { useRoutine } from '@/context/RoutineContext';
 import { useRoutines } from '@/hooks/queries/useRoutines';
 import { routineService } from '@/backend/services/routineServices';
 import { useAuth } from '@/context/AuthContext';
-import SuccessMessage from '@/components/errorHandlingMessages/successMessage';
-import ErrorMessage from '@/components/errorHandlingMessages/errorMessage';
-import { friendService } from '@/backend/services/friendService';
 import type { Routine, RoutineTask } from '@/backend/types/Routine';
-import { Button } from 'react-native-paper';
-import { TaskStatus } from '@/backend/types/Task';
-import { notificationService } from '@/backend/services/notificationService';
-import { NotificationType } from '@/backend/types/Notification';
-import { useRouter } from 'expo-router';
-import { Timestamp, doc, updateDoc, increment, deleteField } from 'firebase/firestore';
-import { db } from '@/backend/config/firebase';
-import type { RoutineInviteNotification } from '@/backend/types/Notification';
+import { Timestamp } from 'firebase/firestore';
 import { generateId } from '@/utils/generateId';
 import Toast from 'react-native-toast-message';
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,7 +18,6 @@ import InfoModal from '@/components/shared/InfoModal';
 import { INFO_CONTENT } from '@/constants/infoContent';
 import FriendShareModal from '@/components/common/FriendShareModal';
 import { useFriends } from '@/hooks/queries/useFriends';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { FriendData } from '@/backend/types/Friend';
 import type Task from '@/backend/types/Task';
 import AddTask from '@/components/tasks/addTask';

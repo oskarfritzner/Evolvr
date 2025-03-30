@@ -6,7 +6,7 @@ import { TaskType } from '@/backend/types/Task';
 import ActiveTask from './activeTask';
 import { useActiveTasks } from "@/hooks/queries/useActiveTasks";
 import { useAuth } from "@/context/AuthContext";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import ErrorMessage from "@/components/errorHandlingMessages/errorMessage";
 import { Ionicons } from '@expo/vector-icons';
 import AddTask from '@/components/tasks/addTask';

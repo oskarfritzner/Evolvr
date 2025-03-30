@@ -4,17 +4,13 @@ import { useTheme } from "@/context/ThemeContext"
 import { useAuth } from "@/context/AuthContext"
 import { JournalType } from '@/backend/types/JournalEntry';
 import RoutineGrid from '@/components/routines/RoutineGrid';
-import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import ChallengeGrid from '@/components/challenges/ChallengeGrid';
-import { Button, Chip } from 'react-native-paper';
+
 import { JournalModal } from '@/components/journal/JournalModal';
 import AllHabits from '@/components/habit/AllHabits';
-import CategoryCardSlider from '@/components/evolve/CategoryCardSlider';
-import CreatePost from "@/components/posts/create-post";
+import CategoryCardSlider from '@/components/category/CategoryCardSlider/CategoryCardSlider';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import TimelineGraph from '@/components/progress/TimelineGraph';
-import { categories } from '@/constants/categories';
-import PremiumButtonAccess from '@/components/premium/PremiumButtonAccess';
 import { useUserData } from '@/hooks/queries/useUserData';
 import { useProgressData } from '@/hooks/queries/useProgressData';
 import logger from '@/utils/logger';
@@ -24,10 +20,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import { WelcomeModal } from '@/components/modals/WelcomeModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import QuickActionsBtnsBar from '@/components/quickActions/QuickActionsBtnsBar';
 
 export default function Dashboard() {
-  const { colors } = useTheme()
-  const { user } = useAuth()
+  const { colors } = useTheme();
+  const { user } = useAuth();
   const { data: userData, isLoading: userLoading, error: userError } = useUserData(user?.uid);
   const { progress: progressData, isLoading: progressLoading } = useProgressData(user?.uid);
   const router = useRouter();
@@ -35,9 +32,6 @@ export default function Dashboard() {
 
   const loading = userLoading || progressLoading;
   const [journalModalVisible, setJournalModalVisible] = useState(false);
-  const [showCreatePost, setShowCreatePost] = useState(false);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(['physical', 'mental']);
-  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | 'all'>('7d');
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [selectedJournalType, setSelectedJournalType] = useState<JournalType | null>(null);
 
@@ -145,57 +139,7 @@ export default function Dashboard() {
             </Text>
           </View>
 
-          {/* Quick Actions */}
-          <View style={[styles(colors).quickActions]}>
-            <Button 
-              mode="contained"
-              onPress={() => {
-                setSelectedJournalType(JournalType.REFLECTION);
-                setJournalModalVisible(true);
-              }}
-              style={[
-                styles(colors).quickActionButton, 
-                { backgroundColor: colors.secondary },
-              ]}
-              contentStyle={{ paddingHorizontal: 2 }}
-              icon="book"
-              labelStyle={{ color: colors.primary, fontSize: 12 }}
-              compact
-            >
-              Journal
-            </Button>
-            <Button 
-              mode="contained"
-              onPress={() => router.push('/goals')}
-              style={[
-                styles(colors).quickActionButton, 
-                { backgroundColor: colors.secondary },
-              ]}
-              contentStyle={{ paddingHorizontal: 2 }}
-              icon="bullseye"
-              labelStyle={{ color: colors.primary, fontSize: 12 }}
-              compact
-            >
-              Set goals
-            </Button>
-            <Button 
-              mode="contained"
-              onPress={() => {
-                setSelectedJournalType(JournalType.GRATITUDE);
-                setJournalModalVisible(true);
-              }}
-              style={[
-                styles(colors).quickActionButton, 
-                { backgroundColor: colors.secondary },
-              ]}
-              contentStyle={{ paddingHorizontal: 2 }}
-              icon="heart"
-              labelStyle={{ color: colors.primary, fontSize: 12 }}
-              compact
-            >
-              Gratitude
-            </Button>
-          </View>
+          <QuickActionsBtnsBar />
 
           {/* Category Progress Cards */}
           {userData?.categories && (
@@ -212,17 +156,17 @@ export default function Dashboard() {
           
           {/* Main Content Cards */}
           <View style={styles(colors).cardsContainer}>
-            {/* Daily Routines Card */}
+            {/* Routines Section */}
             <View style={styles(colors).card}>
               <RoutineGrid compact={true} />
             </View>
 
-            {/* Habits Card */}
+            {/* Habits Section */}
             <View style={styles(colors).card}>
               <AllHabits compact={true} />
             </View>
 
-            {/* Challenges Card */}
+            {/* Challenges Section */}
             <View style={styles(colors).card}>
               <ChallengeGrid compact={true} />
             </View>
@@ -237,6 +181,8 @@ export default function Dashboard() {
             initialType={selectedJournalType}
           />
 
+          {/* Welcome Modal which open the first time the user enters after onboarding*/}
+
           <WelcomeModal 
             visible={showWelcomeModal} 
             onClose={handleWelcomeModalClose} 
@@ -247,7 +193,6 @@ export default function Dashboard() {
   )
 }
 
-// Keep the dynamic styles:
 const styles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,

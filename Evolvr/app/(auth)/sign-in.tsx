@@ -11,19 +11,13 @@ import {
   Alert,
 } from "react-native"
 import { useTheme } from "@/context/ThemeContext"
-import { signInWithEmailAndPassword } from "firebase/auth"
 import { useRouter } from "expo-router"
-import { LinearGradient } from "expo-linear-gradient"
 import { FontAwesome } from "@expo/vector-icons"
-import { useAuth } from '@/context/AuthContext'
 import Toast from 'react-native-toast-message'
 import { useSignIn } from "@/hooks/auth/useSignIn"
 import { useRegistration } from "@/hooks/auth/useRegistration"
-import { registrationService } from "@/backend/services/registrationService"
 import { auth } from "@/backend/config/firebase"
 import { authValidation } from '@/utils/authValidation'
-import { FirebaseError } from 'firebase/app'
-import logger from '@/utils/logger'
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { sendPasswordResetEmail } from "firebase/auth"
 

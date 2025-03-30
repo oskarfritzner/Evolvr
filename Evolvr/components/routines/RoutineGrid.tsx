@@ -7,7 +7,7 @@ import RoutineCard from './RoutineCard';
 import  CreateRoutine  from '@/components/routines/CreateRoutine';
 import { useRoutines } from '@/hooks/queries/useRoutines';
 import { useAuth } from '@/context/AuthContext';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useClientLayoutEffect } from '@/hooks/utils/useClientLayoutEffect';
 import ConfirmationDialog from '@/components/common/ConfirmationDialog';
 import Toast from 'react-native-toast-message';

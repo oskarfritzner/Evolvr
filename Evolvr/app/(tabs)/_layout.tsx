@@ -5,8 +5,7 @@ import { useTheme } from "@/context/ThemeContext"
 import { useAuth } from "@/context/AuthContext"
 import { Redirect } from "expo-router"
 import { View, StyleSheet, Image, Platform } from "react-native"
-import { LoadingSpinner } from "@/components/LoadingSpinner"
-import { useClientLayoutEffect } from '@/hooks/utils/useClientLayoutEffect'
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 
 export default function TabsLayout() {
   const { colors } = useTheme()

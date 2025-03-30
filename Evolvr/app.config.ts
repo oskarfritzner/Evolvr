@@ -57,4 +57,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
   },
   sdkVersion: "52.0.0",
+  web: {
+    bundler: "metro",
+    output: "static",
+    favicon: "./assets/images/favicon.png",
+  },
 });

@@ -13,6 +13,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initializeServices } from '@/backend/services/initServices';
 import { ClientSideLayoutEffect } from '@/components/layout/ClientSideLayoutEffect';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { LogBox } from "react-native";
 
 // Initialize services
 initializeServices();
@@ -31,6 +32,11 @@ const paperTheme = {
   ...MD3LightTheme,
   // Add any custom theme properties here
 };
+
+// Ignore specific warnings
+LogBox.ignoreLogs([
+  'Animated: `useNativeDriver`',
+]); 
 
 // Create a client-side only Toast wrapper
 function ClientSideToast() {

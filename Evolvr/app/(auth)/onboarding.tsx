@@ -1,3 +1,23 @@
+/**
+ * Onboarding Screen
+ * 
+ * This screen handles the user onboarding process after registration.
+ * It consists of 5 steps:
+ * 1. Welcome - Introduction to the app
+ * 2. Profile - Basic user information (username, photo, birth date)
+ * 3. Mood - Current emotional state
+ * 4. Motivation - User's primary motivation for using the app
+ * 5. Goal - User's main goal
+ * 
+ * Features:
+ * - Smooth transitions between steps using MotiView animations
+ * - Progress tracking with animated dots
+ * - Data validation at each step
+ * - Persistent storage of onboarding progress
+ * - Graceful error handling and user feedback
+ * - Cross-platform support (iOS, Android, Web)
+ */
+
 import React, { useState, useEffect } from "react"
 import {
   View,
@@ -14,8 +34,6 @@ import { useTheme } from "@/context/ThemeContext"
 import { useAuth } from "@/context/AuthContext"
 import { useRouter } from "expo-router"
 import { db, auth } from "@/backend/config/firebase"
-import { doc, deleteDoc } from "firebase/firestore"
-import { signInWithEmailAndPassword } from "firebase/auth"
 import { MotiView } from 'moti'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -25,7 +43,7 @@ import { MotivationSlide } from '@/components/onboarding/slides/MotivationSlide'
 import { GoalSlide } from '@/components/onboarding/slides/GoalSlide'
 import { WelcomeSlide } from '@/components/onboarding/slides/WelcomeSlide'
 import { ProfileSlide } from '@/components/onboarding/slides/ProfileSlide'
-import Button from '@/components/Button'
+import Button from '@/components/ui/Button'
 import Toast from 'react-native-toast-message'
 import { MaterialIcons } from '@expo/vector-icons'
 import { registrationService } from '@/backend/services/registrationService'
@@ -42,19 +60,14 @@ if (Platform.OS === 'web') {
   ]);
 }
 
-// Add type for the finalUserData
-interface FinalUserData {
-  email: string;
-  categories: Record<string, CategoryLevel>;
-  overall: { level: number; xp: number; prestige: number };
-  // ... other fields
-}
-
 export default function OnboardingScreen() {
+  // Theme and navigation hooks
   const { colors } = useTheme();
   const router = useRouter();
   const { user, signOut, refreshUserData } = useAuth();
   const insets = useSafeAreaInsets();
+
+  // State management for the onboarding process
   const [currentStep, setCurrentStep] = useState(1);
   const [profile, setProfile] = useState({
     username: '',
@@ -69,14 +82,24 @@ export default function OnboardingScreen() {
   const [isCanceling, setIsCanceling] = useState(false);
   const { data: registrationData, clearRegistrationData } = useRegistration();
 
+  /**
+   * Updates the onboarding progress in Firestore
+   * This allows users to resume their onboarding if they close the app
+   */
   useEffect(() => {
-    // Update onboarding step in incomplete users collection
     if (user?.uid) {
       registrationService.updateOnboardingStep(user.uid, currentStep)
         .catch(console.error);
     }
   }, [currentStep, user?.uid]);
 
+  /**
+   * Handles the cancellation of the onboarding process
+   * - Deletes incomplete user data
+   * - Removes auth user
+   * - Clears registration data
+   * - Redirects to sign-in
+   */
   const handleCancel = async () => {
     Alert.alert(
       "Cancel Registration",
@@ -152,7 +175,10 @@ export default function OnboardingScreen() {
     );
   };
 
-  // Helper function to wait for user data with retries
+  /**
+   * Waits for user data to be available in Firestore
+   * Implements a retry mechanism with exponential backoff
+   */
   const waitForUserData = async (userId: string, maxRetries = 3): Promise<boolean> => {
     for (let i = 0; i < maxRetries; i++) {
       try {
@@ -171,6 +197,12 @@ export default function OnboardingScreen() {
     return false;
   };
 
+  /**
+   * Handles progression to the next step
+   * - Validates current step data
+   * - Updates step counter
+   * - On final step, completes registration and creates user profile
+   */
   const handleNext = async () => {
     // Validate profile data when on profile step
     if (currentStep === 2) {
@@ -215,7 +247,7 @@ export default function OnboardingScreen() {
           return;
         }
 
-        // Complete registration and create full user
+        // Initialize user data with default values and onboarding information
         const finalUserData = {
           email: registrationData?.email,
           ...profile,
@@ -226,6 +258,7 @@ export default function OnboardingScreen() {
             goal,
             birthDate: profile.birthDate,
           },
+          // Initialize user categories with starting levels
           categories: {
             physical: { level: 1, xp: 0 },
             mental: { level: 1, xp: 0 },
@@ -235,6 +268,7 @@ export default function OnboardingScreen() {
             career: { level: 1, xp: 0 },
             relationships: { level: 1, xp: 0 },
           },
+          // Initialize user stats and progress tracking
           overall: { level: 1, xp: 0, prestige: 0 },
           stats: {
             totalTasksCompleted: 0,
@@ -247,15 +281,18 @@ export default function OnboardingScreen() {
             todayXP: 0,
             todayCompletedTasks: [],
           },
+          // Initialize social features
           friends: [],
           activeTasks: [],
           posts: [],
+          // Set up subscription status
           subscription: {
             type: "FREE",
             startDate: new Date(),
             status: "active",
             autoRenew: false
           },
+          // Set up user identifiers
           displayName: profile.username,
           usernameLower: profile.username.toLowerCase(),
           displayNameLower: profile.username.toLowerCase(),
@@ -263,22 +300,18 @@ export default function OnboardingScreen() {
           lastUpdated: new Date()
         };
 
-        // Complete registration
+        // Complete registration process
         await registrationService.completeRegistration(user.uid, finalUserData);
-
-        // Clear registration data
         clearRegistrationData();
-        
-        // Set welcome modal flag
         await AsyncStorage.setItem(`should_show_welcome_${user.uid}`, 'true');
 
-        // Force token refresh and get new token
+        // Ensure fresh auth token
         const currentUser = auth.currentUser;
         if (currentUser) {
           await currentUser.getIdToken(true);
         }
 
-        // Wait for user data to be available with retries
+        // Wait for user data to be available
         let userData = null;
         for (let i = 0; i < 5; i++) {
           try {
@@ -291,7 +324,6 @@ export default function OnboardingScreen() {
           } catch (error) {
             console.error(`Retry ${i + 1} failed:`, error);
           }
-          // Wait before next retry
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
@@ -314,12 +346,19 @@ export default function OnboardingScreen() {
     }
   };
 
+  /**
+   * Handles navigation to the previous step
+   */
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
   };
 
+  /**
+   * Renders the appropriate slide based on current step
+   * Each slide is wrapped in a MotiView for smooth animations
+   */
   const renderStep = () => {
     switch (currentStep) {
       case 1:
@@ -346,6 +385,10 @@ export default function OnboardingScreen() {
     }
   };
 
+  /**
+   * Main render function
+   * Handles both web and mobile layouts
+   */
   const content = (
     <View 
       style={[
@@ -359,6 +402,7 @@ export default function OnboardingScreen() {
     >
       <StatusBar style="auto" />
       
+      {/* Header with cancel button and progress dots */}
       <View style={styles.headerContainer}>
         <TouchableOpacity
           onPress={handleCancel}
@@ -373,6 +417,7 @@ export default function OnboardingScreen() {
           <Text style={[styles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
 
+        {/* Animated progress dots */}
         <View style={styles.progressDots}>
           {[1, 2, 3, 4, 5].map((step) => (
             <MotiView
@@ -394,8 +439,10 @@ export default function OnboardingScreen() {
         </View>
       </View>
 
+      {/* Current step content */}
       {renderStep()}
       
+      {/* Navigation buttons */}
       <MotiView 
         style={styles.buttonContainer}
         animate={{ opacity: 1, translateY: 0 }}
@@ -424,6 +471,7 @@ export default function OnboardingScreen() {
     </View>
   );
 
+  // Handle web-specific layout
   if (Platform.OS === 'web') {
     return (
       <div style={{ 

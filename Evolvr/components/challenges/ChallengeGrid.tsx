@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import ConfirmationDialog from '@/components/common/ConfirmationDialog';
 import ChallengeCard from './ChallengeCard';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface Props {
   style?: ViewStyle;
@@ -205,8 +205,8 @@ export default function ChallengeGrid({ style, compact = false }: Props) {
       }),
       elevation: 2,
       shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
+      shadowOffset: { width: 2, height: 2 },
+      shadowOpacity: 0.6,
       shadowRadius: 4,
     },
     cardHeader: {

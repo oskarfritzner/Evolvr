@@ -1,6 +1,6 @@
 import { Redirect, useRootNavigationState } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import logger from '@/utils/logger';
 
 export default function Index() {

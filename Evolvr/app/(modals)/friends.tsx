@@ -4,7 +4,7 @@ import { useTheme } from "@/context/ThemeContext";
 import FriendsList from "@/components/friends/FriendsList";
 import { useAuth } from "@/context/AuthContext";
 import { useFriends } from "@/hooks/queries/useFriends";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import ErrorMessage from "@/components/errorHandlingMessages/errorMessage";
 
 export default function FriendsModal() {
