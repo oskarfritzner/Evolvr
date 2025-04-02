@@ -112,15 +112,53 @@ export default function SignIn() {
         await AsyncStorage.removeItem("rememberedEmail")
       }
     } catch (error: any) {
-      // Handle specific Firebase auth errors
-      if (error.code === 'auth/user-not-found') {
-        setErrors(prev => ({ ...prev, email: "No account found with this email" }))
-      } else if (error.code === 'auth/wrong-password') {
-        setErrors(prev => ({ ...prev, password: "Incorrect password" }))
-      } else if (error.code === 'auth/invalid-email') {
-        setErrors(prev => ({ ...prev, email: "Invalid email format" }))
-      } else {
-        setErrors(prev => ({ ...prev, general: error.message || "Sign in failed" }))
+      // Handle specific Firebase auth errors with user-friendly Toast messages
+      switch (error.code) {
+        case 'auth/invalid-credential':
+        case 'auth/wrong-password':
+          Toast.show({
+            type: 'error',
+            text1: 'Invalid Credentials',
+            text2: 'The email or password you entered is incorrect.',
+            visibilityTime: 4000,
+            position: 'top'
+          });
+          break;
+        case 'auth/user-not-found':
+          Toast.show({
+            type: 'error',
+            text1: 'Account Not Found',
+            text2: 'No account exists with this email address.',
+            visibilityTime: 4000,
+            position: 'top'
+          });
+          break;
+        case 'auth/invalid-email':
+          Toast.show({
+            type: 'error',
+            text1: 'Invalid Email',
+            text2: 'Please enter a valid email address.',
+            visibilityTime: 4000,
+            position: 'top'
+          });
+          break;
+        case 'auth/too-many-requests':
+          Toast.show({
+            type: 'error',
+            text1: 'Too Many Attempts',
+            text2: 'Please try again later or reset your password.',
+            visibilityTime: 4000,
+            position: 'top'
+          });
+          break;
+        default:
+          Toast.show({
+            type: 'error',
+            text1: 'Sign In Error',
+            text2: 'An unexpected error occurred. Please try again.',
+            visibilityTime: 4000,
+            position: 'top'
+          });
       }
       await authValidation.incrementSignInAttempts()
     }
@@ -351,10 +389,6 @@ export default function SignIn() {
         >
           <Text style={styles.title}>Welcome Back</Text>
 
-          {errors.general ? (
-            <Text style={styles.generalError}>{errors.general}</Text>
-          ) : null}
-
           <View style={styles.inputContainer}>
             <TextInput
               style={[
@@ -369,9 +403,6 @@ export default function SignIn() {
               keyboardType="email-address"
               editable={!signInMutation.isLoading}
             />
-            {errors.email ? (
-              <Text style={styles.errorText}>{errors.email}</Text>
-            ) : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -387,9 +418,6 @@ export default function SignIn() {
               secureTextEntry
               editable={!signInMutation.isLoading}
             />
-            {errors.password ? (
-              <Text style={styles.errorText}>{errors.password}</Text>
-            ) : null}
           </View>
 
           <View style={styles.rememberMeContainer}>
@@ -418,13 +446,12 @@ export default function SignIn() {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.button, styles.googleButton]}
-            onPress={handleGoogleSignUp}
-            disabled={signInMutation.isLoading}
+            style={[styles.button, styles.googleButton, { opacity: 0.5 }]}
+            disabled={true}
           >
             <FontAwesome name="google" size={24} color={colors.primary} />
-            <Text style={[styles.buttonText, { opacity: 0.7 }]}>
-              Sign in with Google (Disabled in Dev)
+            <Text style={[styles.buttonText, { color: '#666666' }]}>
+              Google Sign In (Disabled)
             </Text>
           </TouchableOpacity>
 

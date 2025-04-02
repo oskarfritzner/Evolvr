@@ -356,13 +356,12 @@ export default function Register() {
           </View>
 
           <TouchableOpacity 
-            style={[styles.button, styles.googleButton]}
-            onPress={handleGoogleSignUp}
-            disabled={loading}
+            style={[styles.button, styles.googleButton, { opacity: 0.5 }]}
+            disabled={true}
           >
             <FontAwesome name="google" size={24} color={colors.primary} />
-            <Text style={[styles.buttonText, { opacity: 0.7 }]}>
-              Sign up with Google (Disabled in Dev)
+            <Text style={[styles.buttonText, { color: '#666666' }]}>
+              Google Sign Up (Disabled)
             </Text>
           </TouchableOpacity>
 

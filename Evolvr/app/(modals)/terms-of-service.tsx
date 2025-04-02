@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 export default function TermsOfService() {
   const { colors } = useTheme();
   const router = useRouter();
-  console.log('Terms of Service page rendered');
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>

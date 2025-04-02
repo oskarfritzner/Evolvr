@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from "react";
+import React, { useState, useCallback, useMemo, memo } from "react";
 import { View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Platform, ScrollView } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from "@/context/ThemeContext";
@@ -10,6 +10,9 @@ import BadgesGrid from "@/components/BadgesGrid";
 import { notificationService } from "@/backend/services/notificationService";
 import CreatePost from "@/components/posts/create-post";
 import { UserData } from "@/backend/types/UserData";
+import { ProfileImage } from "@/components/profile/ProfileImage";
+import { ProfileContent } from "@/components/profile/ProfileContent";
+import { useNotificationCount } from "@/hooks/useNotificationCount";
 
 // Define the colors type based on the theme context
 type ThemeColors = ReturnType<typeof useTheme>['colors'];
@@ -192,7 +195,7 @@ const styles = StyleSheet.create({
   },
 });
 
-// Memoized header component
+// Memoized header component with proper comparison
 const ProfileHeader = memo(({ 
   userData, 
   unreadCount, 
@@ -203,7 +206,7 @@ const ProfileHeader = memo(({
   const { colors } = useTheme();
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
       <View style={styles.headerTopRow}>
         <View style={styles.headerLeft}>
           <TouchableOpacity
@@ -240,10 +243,7 @@ const ProfileHeader = memo(({
       <View style={styles.profileSection}>
         <View style={styles.profileImageContainer}>
           <View style={styles.profileImageWrapper}>
-            <Image
-              source={{ uri: userData?.photoURL || "https://via.placeholder.com/120" }}
-              style={styles.profileImage}
-            />
+            <ProfileImage photoURL={userData?.photoURL} />
             <View style={styles.levelIndicator}>
               <View style={[styles.levelLine, { backgroundColor: colors.textPrimary }]} />
               <View style={[styles.levelBadge, { backgroundColor: colors.surface }]}>
@@ -266,6 +266,14 @@ const ProfileHeader = memo(({
         {userData?.bio || "No bio yet"}
       </Text>
     </View>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.userData?.photoURL === nextProps.userData?.photoURL &&
+    prevProps.userData?.username === nextProps.userData?.username &&
+    prevProps.userData?.bio === nextProps.userData?.bio &&
+    prevProps.userData?.overall?.level === nextProps.userData?.overall?.level &&
+    prevProps.unreadCount === nextProps.unreadCount
   );
 });
 
@@ -313,48 +321,20 @@ export default function Profile() {
   const { user } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'posts' | 'badges'>('posts');
-  const [unreadCount, setUnreadCount] = useState(0);
   const [showCreatePost, setShowCreatePost] = useState(false);
-
-  // Handle userData type safely
+  
+  const unreadCount = useNotificationCount(user?.uid);
   const userData: UserData | undefined = user?.userData || undefined;
+  
+  const memoizedCallbacks = useMemo(() => ({
+    handleNotificationsPress: () => router.push("/(modals)/notifications"),
+    handleFriendsPress: () => router.push("/(modals)/friends"),
+    handleSettingsPress: () => router.push("/(profile)/settings"),
+    handleTabChange: (tab: 'posts' | 'badges') => setActiveTab(tab)
+  }), [router]);
 
-  useEffect(() => {
-    if (!user) return;
-    const unsubscribe = notificationService.subscribeToNotifications(
-      user.uid,
-      (notifications) => {
-        const count = notifications.filter(n => 
-          !n.read && 
-          (!('responded' in n) || !n.responded)
-        ).length;
-        setUnreadCount(count);
-      }
-    );
-    return () => unsubscribe();
-  }, [user]);
-
-  const handleTabChange = (tab: 'posts' | 'badges') => {
-    setActiveTab(tab);
-  };
-
-  const handleNotificationsPress = () => router.push("/(modals)/notifications");
-  const handleFriendsPress = () => {
-    setTimeout(() => {
-      router.push("/(modals)/friends");
-    }, 300);
-  };
-  const handleSettingsPress = () => router.push("/settings");
-
-  const renderContent = () => (
-    <>
-      {activeTab === 'posts' ? (
-        <PostGrid userId={user?.uid} />
-      ) : (
-        user?.uid ? <BadgesGrid userId={user.uid} /> : null
-      )}
-    </>
-  );
+  const handleCreatePostClose = useCallback(() => setShowCreatePost(false), []);
+  const handlePostCreated = useCallback(() => router.replace("/(tabs)/profile"), [router]);
 
   return (
     <SafeAreaView 
@@ -364,10 +344,8 @@ export default function Profile() {
       <View style={styles.container}>
         <CreatePost 
           visible={showCreatePost}
-          onClose={() => setShowCreatePost(false)}
-          onPostCreated={() => {
-            router.replace("/(tabs)/profile");
-          }}
+          onClose={handleCreatePostClose}
+          onPostCreated={handlePostCreated}
         />
 
         <ScrollView 
@@ -376,32 +354,25 @@ export default function Profile() {
           showsVerticalScrollIndicator={false}
           stickyHeaderIndices={[1]}
         >
-          <View style={[
-            styles.header, 
-            { 
-              backgroundColor: colors.surface,
-              borderBottomColor: colors.border 
-            }
-          ]}>
-            <ProfileHeader 
-              userData={userData}
-              unreadCount={unreadCount}
-              onNotificationsPress={handleNotificationsPress}
-              onFriendsPress={handleFriendsPress}
-              onSettingsPress={handleSettingsPress}
-            />
-          </View>
-
+          <ProfileHeader 
+            userData={userData}
+            unreadCount={unreadCount}
+            onNotificationsPress={memoizedCallbacks.handleNotificationsPress}
+            onFriendsPress={memoizedCallbacks.handleFriendsPress}
+            onSettingsPress={memoizedCallbacks.handleSettingsPress}
+          />
+          
           <View style={[styles.tabsWrapper, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
             <ProfileTabs 
               activeTab={activeTab}
-              onTabChange={handleTabChange}
+              onTabChange={memoizedCallbacks.handleTabChange}
             />
           </View>
-
-          <View style={styles.content}>
-            {renderContent()}
-          </View>
+          
+          <ProfileContent 
+            activeTab={activeTab}
+            userId={user?.uid}
+          />
         </ScrollView>
 
         <TouchableOpacity 

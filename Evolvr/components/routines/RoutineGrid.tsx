@@ -29,12 +29,34 @@ const RoutineGrid: React.FC<Props> = ({ compact, style }) => {
   const { routines, isLoading } = useRoutines(user?.uid);
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    if (user?.uid) {
+      queryClient.prefetchQuery({
+        queryKey: ['routines', user.uid],
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000
+      });
+    }
+  }, [user?.uid]);
+
   useClientLayoutEffect(() => {
     // Handle any grid layout calculations or animations
   }, [compact, routines?.length]);
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <View style={[styles.container, style]}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.secondary }]}>
+            Your Routines
+          </Text>
+          <View style={[styles.addButton, { backgroundColor: colors.secondary }]} />
+        </View>
+        <View style={[styles.content, compact && styles.compactContent]}>
+          <LoadingSpinner />
+        </View>
+      </View>
+    );
   }
 
   const handleRoutinePress = (routine: Routine) => {

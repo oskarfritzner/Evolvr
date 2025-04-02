@@ -8,10 +8,13 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays, isAfter, isBefore, parseISO } from 'date-fns';
 import { Stack, router } from 'expo-router';
-import { Button, Surface, TextInput } from 'react-native-paper';
+import { Button, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+
+// Mood emoji mapping
+const MOOD_EMOJIS = ['😢', '😕', '😐', '🙂', '😊'];
 
 type JournalTypeInfo = {
   label: string;
@@ -34,32 +37,38 @@ export default function JournalHistory() {
 
   // Calculate date range based on selected dates
   const getDateRange = useCallback(() => {
+    // Format dates to YYYY-MM-DD format for consistent comparison
+    const formatDate = (date: Date) => {
+      return date.toISOString().split('T')[0];
+    };
+
     return {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate)
     };
   }, [startDate, endDate]);
 
   // Fetch journal entries
   const { data: journalEntries, isLoading } = useQuery({
-    queryKey: ['journalHistory', user?.uid, startDate, endDate],
+    queryKey: ['journalHistory', user?.uid, getDateRange().startDate, getDateRange().endDate],
     queryFn: async () => {
       if (!user?.uid) return [];
       const { startDate: start, endDate: end } = getDateRange();
       return journalService.getJournalHistory(user.uid, start, end, 50);
     },
     enabled: !!user?.uid,
-    refetchInterval: 1000 * 60, // Refresh every minute
+    refetchInterval: false, // Don't auto-refresh
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    staleTime: 1000 * 30, // Data becomes stale after 30 seconds
+    refetchOnWindowFocus: false,
   });
 
-  const filteredEntries = journalEntries?.filter(daily => 
-    daily.entries.some(entry => 
-      selectedTypes.length === 0 || selectedTypes.includes(entry.type)
-    )
-  );
+  const filteredEntries = journalEntries?.filter(daily => {
+    const dailyDate = daily.date;
+    const { startDate: start, endDate: end } = getDateRange();
+    
+    // Check if the entry date is within the selected range
+    return dailyDate >= start && dailyDate <= end;
+  });
 
   const renderJournalEntry = ({ item: daily }: { item: DailyJournal }) => (
     <Surface style={[styles.entryCard, { backgroundColor: colors.surface }]}>
@@ -110,17 +119,29 @@ export default function JournalHistory() {
               ? entry.content.content
               : JSON.stringify(entry.content);
 
+          // Get mood from reflection entry
+          const mood = typeof entry.content === 'object' && 'mood' in entry.content 
+            ? entry.content.mood as number
+            : null;
+
           return (
             <View key={entry.id} style={styles.entryItem}>
               <View style={styles.entryHeader}>
-                <FontAwesome5 
-                  name={typeInfo.icon} 
-                  size={16} 
-                  color={colors.primary} 
-                />
-                <Text style={[styles.entryType, { color: colors.textPrimary }]}>
-                  {typeInfo.label}
-                </Text>
+                <View style={styles.headerLeft}>
+                  <FontAwesome5 
+                    name={typeInfo.icon} 
+                    size={16} 
+                    color={colors.primary} 
+                  />
+                  <Text style={[styles.entryType, { color: colors.textPrimary }]}>
+                    {typeInfo.label}
+                  </Text>
+                  {mood !== null && (
+                    <Text style={styles.moodEmoji}>
+                      {MOOD_EMOJIS[mood - 1]}
+                    </Text>
+                  )}
+                </View>
                 <Text style={[styles.entryTime, { color: colors.textSecondary }]}>
                   {format(entry.timestamp.toDate(), 'h:mm a')}
                 </Text>
@@ -137,30 +158,26 @@ export default function JournalHistory() {
     </Surface>
   );
 
-  const handleDateChange = (event: any, selectedDate: Date | undefined, isStart: boolean) => {
-    if (Platform.OS === 'android') {
-      setShowStartPicker(false);
-      setShowEndPicker(false);
-    }
-
-    if (selectedDate) {
+  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date, isStart = true) => {
+    if (event.type === 'set' && selectedDate) {
       if (isStart) {
-        if (selectedDate > endDate) {
-          setEndDate(selectedDate);
-        }
         setStartDate(selectedDate);
-      } else {
-        if (selectedDate < startDate) {
-          setStartDate(selectedDate);
+        if (Platform.OS === 'android') {
+          setShowStartPicker(false);
         }
+      } else {
         setEndDate(selectedDate);
+        if (Platform.OS === 'android') {
+          setShowEndPicker(false);
+        }
+      }
+    } else if (event.type === 'dismissed') {
+      if (isStart) {
+        setShowStartPicker(false);
+      } else {
+        setShowEndPicker(false);
       }
     }
-  };
-
-  const closePickers = () => {
-    setShowStartPicker(false);
-    setShowEndPicker(false);
   };
 
   return (
@@ -188,91 +205,85 @@ export default function JournalHistory() {
         }}
       />
 
-      <View style={styles.datePickerContainer}>
+      <View style={[styles.datePickerContainer, { backgroundColor: colors.background }]}>
         <View style={styles.dateInputContainer}>
-          <TouchableOpacity 
-            onPress={() => {
-              setShowEndPicker(false);
-              setShowStartPicker(true);
-            }}
-            style={[styles.dateInput, { backgroundColor: colors.surface }]}
+          <Button
+            mode="outlined"
+            onPress={() => setShowStartPicker(true)}
+            style={[
+              styles.dateButton,
+              { 
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              }
+            ]}
+            labelStyle={[
+              styles.dateButtonLabel,
+              { color: colors.textPrimary }
+            ]}
+            contentStyle={styles.dateButtonContent}
           >
-            <Text style={{ color: colors.textPrimary }}>
-              {format(startDate, 'MMM dd, yyyy')}
-            </Text>
-          </TouchableOpacity>
+            {format(startDate, 'MMM dd, yyyy')}
+          </Button>
           <Text style={[styles.dateSeperator, { color: colors.textSecondary }]}>to</Text>
-          <TouchableOpacity 
-            onPress={() => {
-              setShowStartPicker(false);
-              setShowEndPicker(true);
-            }}
-            style={[styles.dateInput, { backgroundColor: colors.surface }]}
+          <Button
+            mode="outlined"
+            onPress={() => setShowEndPicker(true)}
+            style={[
+              styles.dateButton,
+              { 
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              }
+            ]}
+            labelStyle={[
+              styles.dateButtonLabel,
+              { color: colors.textPrimary }
+            ]}
+            contentStyle={styles.dateButtonContent}
           >
-            <Text style={{ color: colors.textPrimary }}>
-              {format(endDate, 'MMM dd, yyyy')}
-            </Text>
-          </TouchableOpacity>
+            {format(endDate, 'MMM dd, yyyy')}
+          </Button>
         </View>
 
-        {Platform.OS === 'ios' && (showStartPicker || showEndPicker) && (
-          <Modal
-            transparent={true}
-            animationType="fade"
-            visible={showStartPicker || showEndPicker}
-            onRequestClose={closePickers}
-          >
-            <TouchableWithoutFeedback onPress={closePickers}>
-              <View style={styles.modalOverlay}>
-                <TouchableWithoutFeedback>
-                  <View style={[styles.pickerContainer, { backgroundColor: colors.surface }]}>
-                    <View style={styles.modalHeader}>
-                      <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
-                      <TouchableOpacity 
-                        onPress={closePickers}
-                        style={styles.doneButton}
-                      >
-                        <Text style={[styles.doneButtonText, { color: colors.secondary }]}>Done</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <DateTimePicker
-                      value={showStartPicker ? startDate : endDate}
-                      mode="date"
-                      display="spinner"
-                      onChange={(event, date) => handleDateChange(event, date, showStartPicker)}
-                      maximumDate={new Date()}
-                      minimumDate={showStartPicker ? subDays(new Date(), 365) : startDate}
-                    />
-                  </View>
-                </TouchableWithoutFeedback>
-              </View>
-            </TouchableWithoutFeedback>
-          </Modal>
-        )}
-
-        {Platform.OS === 'android' && (
-          <>
-            {showStartPicker && (
+        {Platform.OS === 'ios' ? (
+          (showStartPicker || showEndPicker) && (
+            <View style={[styles.pickerContainer, { backgroundColor: colors.surface }]}>
               <DateTimePicker
-                value={startDate}
+                testID="dateTimePicker"
+                value={showStartPicker ? startDate : endDate}
                 mode="date"
-                display="default"
-                onChange={(event, date) => handleDateChange(event, date, true)}
+                display="spinner"
+                onChange={(event, date) => handleDateChange(event, date, showStartPicker)}
                 maximumDate={new Date()}
-                minimumDate={subDays(new Date(), 365)}
+                minimumDate={showStartPicker ? subDays(new Date(), 365) : startDate}
+                textColor={colors.textPrimary}
               />
-            )}
-            {showEndPicker && (
-              <DateTimePicker
-                value={endDate}
-                mode="date"
-                display="default"
-                onChange={(event, date) => handleDateChange(event, date, false)}
-                maximumDate={new Date()}
-                minimumDate={startDate}
-              />
-            )}
-          </>
+              <Button
+                mode="text"
+                onPress={() => {
+                  setShowStartPicker(false);
+                  setShowEndPicker(false);
+                }}
+                style={styles.doneButton}
+                labelStyle={{ color: colors.primary }}
+              >
+                Done
+              </Button>
+            </View>
+          )
+        ) : (
+          (showStartPicker || showEndPicker) && (
+            <DateTimePicker
+              testID="dateTimePicker"
+              value={showStartPicker ? startDate : endDate}
+              mode="date"
+              display="default"
+              onChange={(event, date) => handleDateChange(event, date, showStartPicker)}
+              maximumDate={new Date()}
+              minimumDate={showStartPicker ? subDays(new Date(), 365) : startDate}
+            />
+          )
         )}
       </View>
 
@@ -314,15 +325,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    marginBottom: 8,
   },
-  dateInput: {
-    padding: 12,
+  dateButton: {
+    flex: 1,
     borderRadius: 8,
-    minWidth: 120,
+    borderWidth: 1,
+    minHeight: 45,
+  },
+  dateButtonContent: {
+    height: 45,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateButtonLabel: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   dateSeperator: {
     fontSize: 16,
+    paddingHorizontal: 8,
+    fontWeight: '500',
+  },
+  pickerContainer: {
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 3.84,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  doneButton: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
   },
   list: {
     padding: 16,
@@ -351,7 +397,13 @@ const styles = StyleSheet.create({
   entryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   entryType: {
     fontSize: 16,
@@ -360,7 +412,10 @@ const styles = StyleSheet.create({
   },
   entryTime: {
     fontSize: 14,
-    marginLeft: 'auto',
+  },
+  moodEmoji: {
+    fontSize: 16,
+    marginLeft: 8,
   },
   entryContent: {
     fontSize: 14,
@@ -383,46 +438,5 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 16,
     textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  pickerContainer: {
-    padding: 16,
-    paddingTop: 8,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    position: 'relative',
-  },
-  dragHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    opacity: 0.3,
-  },
-  doneButton: {
-    position: 'absolute',
-    right: 0,
-    padding: 8,
-  },
-  doneButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 }); 

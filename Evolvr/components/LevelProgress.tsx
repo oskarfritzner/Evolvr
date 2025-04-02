@@ -21,7 +21,6 @@ interface LevelProgressProps {
 export default function LevelProgress({ category, categories, style }: LevelProgressProps) {
   const { colors } = useTheme();
 
-  console.log(levelService);
 
   let levelInfo;
   let levelType = 'Overall Level';

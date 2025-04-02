@@ -8,6 +8,13 @@
     "scheme": "evolvr",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "owner": "oskarfritzner",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b6ce49fa-114d-45f4-9224-e8e96e31d7c2"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.oskarfritzner.Evolvr",
@@ -82,12 +89,11 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "newArchEnabled": true
+      "typedRoutes": true
     },
     "extra": {
       "eas": {
-        "projectId": "b6ce49fa-114d-45f4-9224-e8e96e31d7c2"
+        "projectId": "03ea9dda-605e-447e-b852-ef15db99aee4"
       }
     }
   }

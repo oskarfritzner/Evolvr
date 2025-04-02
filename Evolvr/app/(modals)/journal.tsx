@@ -54,6 +54,14 @@ export default function JournalPage() {
               <FontAwesome5 name="arrow-left" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
           ),
+          headerRight: () => (
+            <TouchableOpacity 
+              onPress={() => router.push('/journal-history')}
+              style={[styles.headerButton, { backgroundColor: colors.surface }]}
+            >
+              <FontAwesome5 name="history" size={16} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ),
         }}
       />
 
@@ -120,6 +128,6 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 12,
     borderRadius: 24,
-    marginLeft: 16,
+    marginHorizontal: 16,
   },
 }); 

@@ -24,6 +24,7 @@ import { UserData } from "../types/UserData";
 import Task, { TaskType, TaskCompletion } from "@/backend/types/Task";
 import logger from "@/utils/logger";
 import { queryClient } from "@/lib/react-query";
+import Toast from "react-native-toast-message";
 
 export const habitService = {
   // Create a new habit with proper typing
@@ -364,6 +365,8 @@ export const habitService = {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
+      const missedHabits: { habit: Habit; daysMissed: number }[] = [];
+
       for (const habit of habits) {
         const lastCompletedDay = habit.completedDays
           .filter((day) => day.completed)
@@ -389,8 +392,37 @@ export const habitService = {
 
         // If user missed a day (more than 1 day since last completion)
         if (daysDifference > 1) {
-          await this.resetHabitProgress(habit.id);
+          missedHabits.push({
+            habit,
+            daysMissed: daysDifference - 1,
+          });
         }
+      }
+
+      // If there are missed habits, notify the user
+      if (missedHabits.length > 0) {
+        // Store missed habits in user's data for UI to display
+        const userRef = doc(db, "users", userId);
+        await updateDoc(userRef, {
+          missedHabits: missedHabits.map(({ habit, daysMissed }) => ({
+            habitId: habit.id,
+            title: habit.title,
+            daysMissed,
+            lastStreak: habit.streak,
+            timestamp: Timestamp.now(),
+          })),
+        });
+
+        // Show toast notification
+        Toast.show({
+          type: "warning",
+          text1: "Missed Habits",
+          text2: `You missed ${missedHabits.length} habit${
+            missedHabits.length > 1 ? "s" : ""
+          } yesterday. Check your habits to restart or continue.`,
+          position: "bottom",
+          visibilityTime: 4000,
+        });
       }
     } catch (error) {
       logger.error("Error checking missed days:", error);
@@ -398,13 +430,28 @@ export const habitService = {
     }
   },
 
-  // Reset habit progress
-  async resetHabitProgress(habitId: string): Promise<void> {
+  // Reset habit progress with user confirmation
+  async resetHabitProgress(
+    habitId: string,
+    shouldRestart: boolean = false
+  ): Promise<void> {
     try {
       const habitRef = doc(db, "habits", habitId);
-      const today = new Date();
+      const habitDoc = await getDoc(habitRef);
+      const habit = habitDoc.data() as Habit;
 
-      // Create new completion progress array
+      if (!shouldRestart) {
+        // If not restarting, just mark as missed but keep progress
+        await updateDoc(habitRef, {
+          streak: 0,
+          completedToday: false,
+          lastMissedDate: Timestamp.now(),
+        });
+        return;
+      }
+
+      // If restarting, reset everything
+      const today = new Date();
       const newCompletionProgress = Array(66)
         .fill(null)
         .map((_, index) => ({
@@ -418,6 +465,15 @@ export const habitService = {
         completionProgress: newCompletionProgress,
         isEstablished: false,
         updatedAt: new Date(),
+        lastMissedDate: null, // Clear the missed date when restarting
+      });
+
+      // Show confirmation toast
+      Toast.show({
+        type: "info",
+        text1: "Habit Restarted",
+        text2: "Your 66-day challenge has been reset. You can start fresh!",
+        position: "bottom",
       });
     } catch (error) {
       logger.error("Error resetting habit progress:", error);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform } from "react-native"
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity } from "react-native"
 import { useTheme } from "@/context/ThemeContext"
 import { useAuth } from "@/context/AuthContext"
 import { JournalType } from '@/backend/types/JournalEntry';
@@ -84,29 +84,56 @@ export default function Dashboard() {
     setShowWelcomeModal(false);
   };
 
+  // Add safety check for user authentication
+  useEffect(() => {
+    if (!user) {
+      // If no user, redirect to sign in
+      router.replace('/(auth)/sign-in');
+      return;
+    }
+  }, [user]);
+
   // Show loading spinner while data is loading
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <LoadingSpinner />
-      </SafeAreaView>
-    );
-  }
-
-  // Handle errors gracefully
-  if (userError) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={styles(colors).container}>
-          <Text style={styles(colors).errorText}>
-            Unable to load user data. Please try again later.
-          </Text>
+      <SafeAreaView style={[staticStyles.safeArea]}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <LoadingSpinner />
+          <Text style={{ marginTop: 10, color: colors.textSecondary }}>Loading your dashboard...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  if (!user) return null;
+  // Handle errors gracefully with retry option
+  if (userError) {
+    return (
+      <SafeAreaView style={[staticStyles.safeArea]}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Text style={[styles(colors).errorText, { marginBottom: 10 }]}>
+            Unable to load your dashboard data
+          </Text>
+          <TouchableOpacity 
+            onPress={() => queryClient.invalidateQueries({ queryKey: ['userData', user?.uid] })}
+            style={[styles(colors).button, { backgroundColor: colors.secondary }]}
+          >
+            <Text style={{ color: colors.surface }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Add null check for user data
+  if (!userData) {
+    return (
+      <SafeAreaView style={[staticStyles.safeArea]}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: colors.textSecondary }}>Setting up your dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Replace progress data log with more concise version
   logger.dev('Progress data:', {
@@ -115,12 +142,6 @@ export default function Dashboard() {
     timestamp: new Date().toISOString()
   });
 
-  // Add debug logs to check the data
-  console.log('Dashboard - User Data:', {
-    uid: user?.uid,
-    categories: userData?.categories,
-    sample: userData?.categories?.physical
-  });
 
   return (
     <SafeAreaView style={[staticStyles.safeArea]} edges={['top']}>
@@ -145,10 +166,6 @@ export default function Dashboard() {
           {userData?.categories && (
             <CategoryCardSlider 
               onCategoryPress={(category: string) => {
-                console.log('Category pressed:', {
-                  category,
-                  data: userData.categories[category]
-                });
                 router.push(`/(categoryPages)/${category}` as any);
               }}
             />
@@ -294,5 +311,10 @@ const styles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     padding: 16,
     color: colors.error,
+  },
+  button: {
+    padding: 12,
+    borderRadius: 6,
+    backgroundColor: colors.secondary,
   },
 });

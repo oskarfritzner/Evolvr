@@ -72,6 +72,7 @@ export interface RoutineTaskWithMeta {
       completedAt: number;
     }>;
   };
+  days: number[];
 }
 
 export interface TaskCompletion {

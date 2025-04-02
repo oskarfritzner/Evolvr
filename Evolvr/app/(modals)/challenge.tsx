@@ -49,17 +49,8 @@ export default function ChallengeModal() {
     if (challenge?.id && userChallenges) {
       const isUserParticipating = userChallenges.some((c: ChallengeParticipation) => c.id === challenge.id);
       setIsParticipating(isUserParticipating);
-      console.log("Challenge participation status:", {
-        challengeId: challenge.id,
-        isParticipating,
-        userChallengesCount: userChallenges.length
-      });
     }
   }, [challenge?.id, userChallenges]);
-
-  useEffect(() => {
-    console.log("Full challenge data:", challenge);
-  }, [challenge]);
 
   const loadChallengeAndTasks = async (challengeId: string) => {
     try {

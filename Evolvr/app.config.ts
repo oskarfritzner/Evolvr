@@ -10,30 +10,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: "automatic",
   scheme: "evolvr",
   extra: {
+    ...config.extra,
+    eas: {
+      projectId: "03ea9dda-605e-447e-b852-ef15db99aee4",
+    },
     OPENAI_API_KEY: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
     AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
     AZURE_OPENAI_API_KEY: process.env.AZURE_OPENAI_API_KEY,
   }, // Your app's URL scheme
-  plugins: [
-    // ... other plugins
-    "expo-secure-store",
-    "expo-dev-client",
-  ],
+  plugins: ["expo-secure-store", "expo-dev-client"],
   ios: {
     bundleIdentifier: "com.oskarfritzner.Evolvr",
     associatedDomains: ["applinks:evolvr.com"],
     infoPlist: {
-      CFBundleURLTypes: [
-        {
-          CFBundleURLSchemes: [
-            "com.googleusercontent.apps.31085337846-scv1e3m6caggsc5bl5b2tsgcmuhfcnha",
-          ],
-        },
-      ],
-      googleSignInReservedClientId:
-        "com.googleusercontent.apps.31085337846-scv1e3m6caggsc5bl5b2tsgcmuhfcnha",
+      ITSAppUsesNonExemptEncryption: false,
     },
-    googleServicesFile: "./GoogleService-Info.plist",
   },
   android: {
     // ... other Android config

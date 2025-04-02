@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Button } from 'react-native-paper';
 import { ChatModal } from '@/components/chat/ChatModal';
+import { JournalModal } from '@/components/journal/JournalModal';
 
 export default function QuickActionsBtnsBar() {
     const { colors } = useTheme();
@@ -16,6 +17,11 @@ export default function QuickActionsBtnsBar() {
 
     const handleChatModalClose = () => {
         setChatModalVisible(false);
+    };
+
+    const handleJournalModalClose = () => {
+        setJournalModalVisible(false);
+        setSelectedJournalType(null);
     };
 
     return (
@@ -51,7 +57,7 @@ export default function QuickActionsBtnsBar() {
             >
                 <Text>Set Goals</Text>
             </Button>
-                        <Button
+            <Button
                 mode="contained"
                 onPress={() => {
                     setChatModalVisible(true);
@@ -66,14 +72,20 @@ export default function QuickActionsBtnsBar() {
             >
                 <Text>Mindset coach</Text>
             </Button>
-                    <ChatModal
-            visible={chatModalVisible}
-            onClose={handleChatModalClose}
-            mode="mindsetCoach"
-        />
+
+            <JournalModal
+                visible={journalModalVisible}
+                onClose={handleJournalModalClose}
+                initialType={selectedJournalType}
+            />
+
+            <ChatModal
+                visible={chatModalVisible}
+                onClose={handleChatModalClose}
+                mode="mindsetCoach"
+            />
         </View>
     );
-
 }
 
 const styles = (colors: any) => StyleSheet.create({
@@ -88,5 +100,4 @@ const styles = (colors: any) => StyleSheet.create({
     quickActionButton: {
         marginHorizontal: 4,
     }
-
 })

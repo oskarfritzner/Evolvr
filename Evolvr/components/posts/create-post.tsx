@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, KeyboardAvoidingView, Platform, Modal, SafeAreaView, Animated, TextInput, ScrollView, ActionSheetIOS } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
@@ -24,6 +24,106 @@ type Privacy = 'public' | 'friends' | 'private';
 // Add a helper function to check if we're on web
 const isWeb = Platform.OS === 'web';
 
+// Memoized header component
+const Header = memo(({ 
+  onClose, 
+  onSubmit, 
+  isDisabled, 
+  isLoading, 
+  colors 
+}: { 
+  onClose: () => void;
+  onSubmit: () => void;
+  isDisabled: boolean;
+  isLoading: boolean;
+  colors: any;
+}) => (
+  <View style={[styles.header, { 
+    backgroundColor: colors.surface,
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  }]}>
+    <TouchableOpacity 
+      style={styles.closeButton} 
+      onPress={onClose}
+    >
+      <Ionicons name="close" size={24} color={colors.textPrimary} />
+    </TouchableOpacity>
+    
+    <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+      Create Post
+    </Text>
+
+    <TouchableOpacity 
+      onPress={onSubmit}
+      disabled={isDisabled || isLoading}
+      style={[styles.submitButton, {
+        backgroundColor: isDisabled ? colors.border : colors.primary,
+        opacity: isLoading ? 0.7 : 1,
+      }]}
+    >
+      <Text style={[styles.submitButtonText, { color: colors.labelPrimary }]}>
+        {isLoading ? 'Posting...' : 'Post'}
+      </Text>
+    </TouchableOpacity>
+  </View>
+));
+
+// Memoized privacy selector component
+const PrivacySelector = memo(({ 
+  privacy, 
+  onPrivacyChange,
+  colors 
+}: {
+  privacy: Privacy;
+  onPrivacyChange: (privacy: Privacy) => void;
+  colors: any;
+}) => {
+  const getPrivacyIcon = () => {
+    switch(privacy) {
+      case 'public': return 'globe';
+      case 'friends': return 'user-friends';
+      case 'private': return 'lock';
+      default: return 'globe';
+    }
+  };
+
+  const getPrivacyLabel = () => {
+    switch(privacy) {
+      case 'public': return 'Everyone';
+      case 'friends': return 'Friends';
+      case 'private': return 'Only me';
+      default: return 'Everyone';
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={() => {
+        const options: Privacy[] = ['public', 'friends', 'private'];
+        const currentIndex = options.indexOf(privacy);
+        const nextIndex = (currentIndex + 1) % options.length;
+        onPrivacyChange(options[nextIndex]);
+      }}
+      style={[styles.privacySelector, { backgroundColor: colors.background }]}
+    >
+      <FontAwesome5 
+        name={getPrivacyIcon()} 
+        size={14} 
+        color={colors.textSecondary}
+      />
+      <Text style={[styles.privacyText, { color: colors.textSecondary }]}>
+        {getPrivacyLabel()}
+      </Text>
+      <FontAwesome5 
+        name="chevron-down" 
+        size={10} 
+        color={colors.textSecondary}
+      />
+    </TouchableOpacity>
+  );
+});
+
 const CreatePost: React.FC<Props> = ({ visible, onClose, onPostCreated }) => {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -37,85 +137,28 @@ const CreatePost: React.FC<Props> = ({ visible, onClose, onPostCreated }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getPrivacyIcon = () => {
-    switch(privacy) {
-      case 'public':
-        return 'globe';
-      case 'friends':
-        return 'user-friends';
-      case 'private':
-        return 'lock';
-      default:
-        return 'globe';
-    }
-  };
+  // Memoized handlers
+  const handlePrivacyChange = useCallback((newPrivacy: Privacy) => {
+    setPrivacy(newPrivacy);
+  }, []);
 
-  const getPrivacyLabel = () => {
-    switch(privacy) {
-      case 'public':
-        return 'Everyone';
-      case 'friends':
-        return 'Friends';
-      case 'private':
-        return 'Only me';
-      default:
-        return 'Everyone';
-    }
-  };
-
-  const requestMediaLibraryPermission = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Sorry, we need camera roll permissions to make this work!');
-      return false;
-    }
-    return true;
-  };
-
-  const requestCameraPermission = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Sorry, we need camera permissions to make this work!');
-      return false;
-    }
-    return true;
-  };
-
-  const takePhoto = async () => {
+  const handleImagePick = useCallback(async () => {
     try {
-      const hasPermission = await requestCameraPermission();
-      if (!hasPermission) return;
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-        exif: false,
-        base64: false,
-      });
-
-      if (!result.canceled && result.assets[0].uri) {
-        setImage(result.assets[0].uri);
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Toast.show({
+          type: 'error',
+          text1: 'Permission needed',
+          text2: 'Please allow access to your photo library'
+        });
+        return;
       }
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      alert('Failed to take photo. Please try again.');
-    }
-  };
-
-  const pickImage = async () => {
-    try {
-      const hasPermission = await requestMediaLibraryPermission();
-      if (!hasPermission) return;
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
-        exif: false,
-        base64: false,
       });
 
       if (!result.canceled && result.assets[0].uri) {
@@ -123,35 +166,46 @@ const CreatePost: React.FC<Props> = ({ visible, onClose, onPostCreated }) => {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      alert('Failed to pick image. Please try again.');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to pick image'
+      });
     }
-  };
+  }, []);
 
-  const showImageOptions = () => {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Take Photo', 'Choose from Library'],
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) {
-            takePhoto();
-          } else if (buttonIndex === 2) {
-            pickImage();
-          }
-        }
-      );
-    } else if (isWeb) {
-      // On web, just open file picker directly
-      pickImage();
-    } else {
-      // For Android, show modal
-      setShowOptionsModal(true);
+  const handleTakePhoto = useCallback(async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Toast.show({
+          type: 'error',
+          text1: 'Permission needed',
+          text2: 'Please allow access to your camera'
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0].uri) {
+        setImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to take photo'
+      });
     }
-  };
+  }, []);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!user?.uid || !title.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -163,8 +217,7 @@ const CreatePost: React.FC<Props> = ({ visible, onClose, onPostCreated }) => {
         const response = await fetch(image);
         imageBlob = await response.blob();
         
-        // Validate image size
-        if (imageBlob.size > 5 * 1024 * 1024) { // 5MB limit
+        if (imageBlob.size > 5 * 1024 * 1024) {
           throw new Error('Image size too large. Please choose an image under 5MB.');
         }
       }
@@ -185,28 +238,53 @@ const CreatePost: React.FC<Props> = ({ visible, onClose, onPostCreated }) => {
       setImage(null);
       setPrivacy("public");
 
-      // Show success message
       Toast.show({
         type: "success",
         text1: "Post created successfully",
       });
 
-      // Invalidate and refetch queries
+      // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ["communityFeed"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
 
-      // Close modal
       onClose();
-      if (onPostCreated) {
-        onPostCreated();
-      }
+      onPostCreated?.();
     } catch (error) {
       console.error("Error creating post:", error);
-      setError("Failed to create post. Please try again.");
+      setError(error instanceof Error ? error.message : "Failed to create post");
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: error instanceof Error ? error.message : "Failed to create post"
+      });
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [user, title, description, image, privacy, isSubmitting, onClose, onPostCreated, queryClient]);
+
+  const showImageOptions = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Take Photo', 'Choose from Library'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            handleTakePhoto();
+          } else if (buttonIndex === 2) {
+            handleImagePick();
+          }
+        }
+      );
+    } else if (isWeb) {
+      handleImagePick();
+    } else {
+      setShowOptionsModal(true);
+    }
+  }, [handleTakePhoto, handleImagePick]);
+
+  const isDisabled = !title && !description && !image;
 
   return (
     <Modal
@@ -218,38 +296,13 @@ const CreatePost: React.FC<Props> = ({ visible, onClose, onPostCreated }) => {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={[styles.overlay, { backgroundColor: colors.background }]}>
           <SafeAreaView style={styles.modalContainer}>
-            {/* Header */}
-            <View style={[styles.header, { 
-              backgroundColor: colors.surface,
-              borderBottomColor: colors.border,
-              borderBottomWidth: StyleSheet.hairlineWidth,
-            }]}>
-              <TouchableOpacity 
-                style={styles.closeButton} 
-                onPress={onClose}
-              >
-                <Ionicons name="close" size={24} color={colors.textPrimary} />
-              </TouchableOpacity>
-              
-              <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-                Create Post
-              </Text>
-
-              <TouchableOpacity 
-                onPress={handleSubmit}
-                disabled={loading || (!title && !description && !image)}
-                style={[styles.submitButton, {
-                  backgroundColor: (!title && !description && !image) ? colors.border : colors.primary,
-                  opacity: loading ? 0.7 : 1,
-                }]}
-              >
-                <Text style={[styles.submitButtonText, { 
-                  color: colors.labelPrimary,
-                }]}>
-                  {loading ? 'Posting...' : 'Post'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <Header 
+              onClose={onClose}
+              onSubmit={handleSubmit}
+              isDisabled={isDisabled}
+              isLoading={isSubmitting}
+              colors={colors}
+            />
 
             <KeyboardAvoidingView 
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -274,29 +327,11 @@ const CreatePost: React.FC<Props> = ({ visible, onClose, onPostCreated }) => {
                       <Text style={[styles.userName, { color: colors.textPrimary }]}>
                         {user?.userData?.username || 'User'}
                       </Text>
-                      <TouchableOpacity
-                        onPress={() => {
-                          const options: Privacy[] = ['public', 'friends', 'private'];
-                          const currentIndex = options.indexOf(privacy);
-                          const nextIndex = (currentIndex + 1) % options.length;
-                          setPrivacy(options[nextIndex]);
-                        }}
-                        style={[styles.privacySelector, { backgroundColor: colors.background }]}
-                      >
-                        <FontAwesome5 
-                          name={getPrivacyIcon()} 
-                          size={14} 
-                          color={colors.textSecondary}
-                        />
-                        <Text style={[styles.privacyText, { color: colors.textSecondary }]}>
-                          {getPrivacyLabel()}
-                        </Text>
-                        <FontAwesome5 
-                          name="chevron-down" 
-                          size={10} 
-                          color={colors.textSecondary}
-                        />
-                      </TouchableOpacity>
+                      <PrivacySelector 
+                        privacy={privacy}
+                        onPrivacyChange={handlePrivacyChange}
+                        colors={colors}
+                      />
                     </View>
                   </View>
                 </View>
@@ -379,7 +414,7 @@ const CreatePost: React.FC<Props> = ({ visible, onClose, onPostCreated }) => {
                       style={[styles.optionButton, { borderBottomColor: colors.border }]}
                       onPress={() => {
                         setShowOptionsModal(false);
-                        takePhoto();
+                        handleTakePhoto();
                       }}
                     >
                       <MaterialIcons name="camera-alt" size={24} color={colors.primary} />
@@ -392,7 +427,7 @@ const CreatePost: React.FC<Props> = ({ visible, onClose, onPostCreated }) => {
                       style={styles.optionButton}
                       onPress={() => {
                         setShowOptionsModal(false);
-                        pickImage();
+                        handleImagePick();
                       }}
                     >
                       <MaterialIcons name="photo-library" size={24} color={colors.primary} />
@@ -569,4 +604,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CreatePost; 
+export default memo(CreatePost); 

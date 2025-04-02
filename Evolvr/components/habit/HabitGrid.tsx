@@ -1,12 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import HabitItem from './HabitItem';
+import MissedHabitsAlert from './MissedHabitsAlert';
 import { MotiView } from 'moti';
 import { useAuth } from '@/context/AuthContext';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { habitService } from '@/backend/services/habitService';
 import Toast from 'react-native-toast-message';
 import { Habit } from '@/backend/types/Habit';
+import { UserData } from '@/backend/types/UserData';
 
 interface HabitGridProps {
   habits: Habit[];
@@ -17,10 +19,19 @@ export default function HabitGrid({ habits, onRefresh }: HabitGridProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [showMissedAlert, setShowMissedAlert] = useState(true);
+  const [lastCheckTimestamp, setLastCheckTimestamp] = useState<number>(0);
+
+  // Query for user data to get missed habits
+  const { data: userData } = useQuery<UserData>({
+    queryKey: ['userData', user?.uid],
+    enabled: !!user?.uid,
+  });
   
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await queryClient.invalidateQueries({ queryKey: ['habits', user?.uid] });
+    await queryClient.invalidateQueries({ queryKey: ['userData', user?.uid] });
     if (onRefresh) onRefresh();
     setRefreshing(false);
   }, [queryClient, user?.uid, onRefresh]);
@@ -63,29 +74,60 @@ export default function HabitGrid({ habits, onRefresh }: HabitGridProps) {
     }
   }, [queryClient, user?.uid]);
 
+  // Check for missed habits only on mount and after long intervals
+  useEffect(() => {
+    const now = Date.now();
+    // Only check if it's been more than 1 hour since last check
+    if (user?.uid && (now - lastCheckTimestamp > 3600000)) {
+      const checkMissedHabits = async () => {
+        try {
+          await habitService.checkAndHandleMissedDays(user.uid);
+          setLastCheckTimestamp(now);
+        } catch (error) {
+          console.error('Error checking missed habits:', error);
+        }
+      };
+      checkMissedHabits();
+    }
+  }, [user?.uid, lastCheckTimestamp]);
+
+  const handleDismissMissedAlert = useCallback(() => {
+    setShowMissedAlert(false);
+  }, []);
+
   return (
-    <ScrollView
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
-      contentContainerStyle={styles.container}
-    >
-      {habits.map((habit) => (
-        <MotiView
-          key={habit.id}
-          from={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: 'timing', duration: 300 }}
-        >
-          <HabitItem
-            habit={habit}
-            onRefresh={handleRefresh}
-            onDelete={() => handleDelete(habit.id)}
-            onComplete={handleHabitComplete}
-          />
-        </MotiView>
-      ))}
-    </ScrollView>
+    <>
+      {/* Show missed habits alert if there are any and not dismissed */}
+      {showMissedAlert && userData?.missedHabits && userData.missedHabits.length > 0 && (
+        <MissedHabitsAlert
+          missedHabits={userData.missedHabits}
+          onDismiss={handleDismissMissedAlert}
+        />
+      )}
+
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        contentContainerStyle={styles.container}
+      >
+        {habits.map((habit) => (
+          <MotiView
+            key={habit.id}
+            from={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'timing', duration: 300 }}
+          >
+            <HabitItem
+              habit={habit}
+              onRefresh={handleRefresh}
+              onDelete={() => handleDelete(habit.id)}
+              onComplete={handleHabitComplete}
+            />
+          </MotiView>
+        ))}
+      </ScrollView>
+    </>
   );
 }
 

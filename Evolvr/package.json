@@ -10,7 +10,8 @@
     "web": "expo start --web",
     "test": "jest --watchAll",
     "lint": "expo lint",
-    "init-tasks": "tsx scripts/initializeTasks.ts"
+    "init-tasks": "tsx scripts/initializeTasks.ts",
+    "prebuild": "cp ios/GoogleService-Info.plist ios/Evolvr/GoogleService-Info.plist"
   },
   "jest": {
     "preset": "jest-expo"
@@ -29,7 +30,7 @@
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-community/datetimepicker": "8.2.0",
     "@react-native-community/netinfo": "11.4.1",
-    "@react-native-community/slider": "^4.5.6",
+    "@react-native-community/slider": "4.5.5",
     "@react-native-google-signin/google-signin": "^13.2.0",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
@@ -41,24 +42,24 @@
     "clsx": "^2.1.1",
     "date-fns": "^2.30.0",
     "dotenv": "^16.4.7",
-    "expo": "~52.0.35",
+    "expo": "~52.0.42",
     "expo-auth-session": "~6.0.3",
     "expo-blur": "~14.0.3",
     "expo-constants": "~17.0.6",
     "expo-crypto": "~14.0.2",
-    "expo-dev-client": "~5.0.12",
+    "expo-dev-client": "~5.0.17",
     "expo-font": "~13.0.3",
     "expo-haptics": "~14.0.1",
-    "expo-image": "~2.0.5",
+    "expo-image": "~2.0.7",
     "expo-image-picker": "~16.0.4",
     "expo-linear-gradient": "~14.0.2",
     "expo-linking": "~7.0.4",
-    "expo-router": "~4.0.17",
+    "expo-router": "~4.0.19",
     "expo-secure-store": "~14.0.1",
     "expo-splash-screen": "^0.29.22",
     "expo-status-bar": "~2.0.1",
     "expo-symbols": "~0.2.1",
-    "expo-system-ui": "~4.0.7",
+    "expo-system-ui": "~4.0.9",
     "expo-web-browser": "~14.0.2",
     "firebase": "^11.3.1",
     "framer-motion": "^12.4.2",
@@ -68,7 +69,7 @@
     "react": "^18.3.1",
     "react-dom": "18.3.1",
     "react-error-boundary": "^5.0.0",
-    "react-native": "^0.76.7",
+    "react-native": "0.76.8",
     "react-native-background-fetch": "^4.2.7",
     "react-native-chart-kit": "^6.12.0",
     "react-native-dropdown-picker": "^5.4.6",
@@ -97,18 +98,24 @@
     "@types/jest": "^29.5.14",
     "@types/lodash": "^4.17.16",
     "@types/react": "~18.3.12",
-    "@types/react-native": "^0.72.8",
     "@types/react-test-renderer": "^18.3.1",
     "@types/uuid": "^10.0.0",
     "babel-plugin-module-resolver": "^5.0.2",
     "install": "^0.13.0",
     "jest": "^29.2.1",
-    "jest-expo": "~52.0.4",
-    "npm": "^10.9.2",
+    "jest-expo": "~52.0.6",
     "react-test-renderer": "18.3.1",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "listUnknownPackages": false,
+        "exclude": ["react-native-chart-kit"]
+      }
+    }
+  }
 }

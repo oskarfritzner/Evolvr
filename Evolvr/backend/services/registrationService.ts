@@ -15,9 +15,6 @@ import { CategoryLevel, UserLevels } from "@/backend/types/Level";
 import { levelService } from "@/backend/services/levelService";
 import { usernameService } from "@/backend/services/usernameService";
 
-// Verify categories are imported correctly
-console.log("Available categories:", categories);
-
 const COLLECTION = "incompleteUsers";
 
 export const registrationService = {
@@ -43,8 +40,6 @@ export const registrationService = {
 
   async completeRegistration(userId: string, userData: any): Promise<void> {
     try {
-      console.log("Starting registration completion for user:", userId);
-
       // Validate and reserve username
       if (userData.username) {
         const validation = usernameService.validateUsername(userData.username);

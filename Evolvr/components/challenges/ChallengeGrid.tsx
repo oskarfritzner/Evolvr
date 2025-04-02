@@ -47,96 +47,6 @@ export default function ChallengeGrid({ style, compact = false }: Props) {
   const queryClient = useQueryClient();
   const [leaveChallengeId, setLeaveChallengeId] = useState<string | null>(null);
 
-  // Query user's challenges
-  const { data: participations = [], isLoading } = useQuery<ChallengeParticipation[]>({
-    queryKey: ['userChallenges', user?.uid],
-    queryFn: async () => {
-      if (!user?.uid) return [];
-      return challengeService.getUserChallenges(user.uid);
-    },
-    enabled: !!user?.uid,
-  });
-
-  // Convert participations to UserChallenge format
-  const userChallenges = participations.map(participationToUserChallenge);
-
-  useEffect(() => {
-    checkFailedChallenges();
-  }, []);
-
-  const checkFailedChallenges = async () => {
-    if (!user?.uid) return;
-    const failedChallenges = await challengeService.checkFailedChallenges(user.uid);
-    if (failedChallenges.length > 0) {
-      setFailedChallenge(participationToUserChallenge(failedChallenges[0]));
-    }
-  };
-
-  const handleRestart = async () => {
-    if (!user?.uid || !failedChallenge) return;
-    try {
-      await challengeService.resetChallengeProgress(user.uid, failedChallenge.id);
-      queryClient.invalidateQueries({ queryKey: ['userChallenges', user.uid] });
-      Toast.show({
-        type: 'success',
-        text1: 'Challenge Reset',
-        text2: 'Your challenge has been reset. Good luck!'
-      });
-      setFailedChallenge(null);
-    } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to Reset',
-        text2: 'Please try again'
-      });
-    }
-  };
-
-  const handleQuit = async () => {
-    if (!user?.uid || !failedChallenge) return;
-    try {
-      await challengeService.quitChallenge(user.uid, failedChallenge.id);
-      queryClient.invalidateQueries({ queryKey: ['userChallenges', user.uid] });
-      Toast.show({
-        type: 'success',
-        text1: 'Challenge Quit',
-        text2: 'Challenge has been removed from your active challenges'
-      });
-      setFailedChallenge(null);
-    } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to Quit',
-        text2: 'Please try again'
-      });
-    }
-  };
-
-  const handleLeaveChallenge = async () => {
-    if (!user?.uid || !leaveChallengeId) return;
-    
-    try {
-      await challengeService.quitChallenge(user.uid, leaveChallengeId);
-      queryClient.invalidateQueries({ queryKey: ['userChallenges', user.uid] });
-      Toast.show({
-        type: 'success',
-        text1: 'Left challenge successfully'
-      });
-    } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to leave challenge'
-      });
-    } finally {
-      setLeaveChallengeId(null);
-    }
-  };
-
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -249,6 +159,122 @@ export default function ChallengeGrid({ style, compact = false }: Props) {
       borderRadius: 3,
     },
   });
+
+  // Query user's challenges
+  const { data: participations = [], isLoading } = useQuery<ChallengeParticipation[]>({
+    queryKey: ['userChallenges', user?.uid],
+    queryFn: async () => {
+      if (!user?.uid) return [];
+      return challengeService.getUserChallenges(user.uid);
+    },
+    enabled: !!user?.uid,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000
+  });
+
+  // Convert participations to UserChallenge format
+  const userChallenges = participations.map(participationToUserChallenge);
+
+  useEffect(() => {
+    if (user?.uid) {
+      // Prefetch challenges data
+      queryClient.prefetchQuery({
+        queryKey: ['userChallenges', user.uid],
+        queryFn: async () => challengeService.getUserChallenges(user.uid),
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000
+      });
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    checkFailedChallenges();
+  }, []);
+
+  const checkFailedChallenges = async () => {
+    if (!user?.uid) return;
+    const failedChallenges = await challengeService.checkFailedChallenges(user.uid);
+    if (failedChallenges.length > 0) {
+      setFailedChallenge(participationToUserChallenge(failedChallenges[0]));
+    }
+  };
+
+  const handleRestart = async () => {
+    if (!user?.uid || !failedChallenge) return;
+    try {
+      await challengeService.resetChallengeProgress(user.uid, failedChallenge.id);
+      queryClient.invalidateQueries({ queryKey: ['userChallenges', user.uid] });
+      Toast.show({
+        type: 'success',
+        text1: 'Challenge Reset',
+        text2: 'Your challenge has been reset. Good luck!'
+      });
+      setFailedChallenge(null);
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Reset',
+        text2: 'Please try again'
+      });
+    }
+  };
+
+  const handleQuit = async () => {
+    if (!user?.uid || !failedChallenge) return;
+    try {
+      await challengeService.quitChallenge(user.uid, failedChallenge.id);
+      queryClient.invalidateQueries({ queryKey: ['userChallenges', user.uid] });
+      Toast.show({
+        type: 'success',
+        text1: 'Challenge Quit',
+        text2: 'Challenge has been removed from your active challenges'
+      });
+      setFailedChallenge(null);
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Quit',
+        text2: 'Please try again'
+      });
+    }
+  };
+
+  const handleLeaveChallenge = async () => {
+    if (!user?.uid || !leaveChallengeId) return;
+    
+    try {
+      await challengeService.quitChallenge(user.uid, leaveChallengeId);
+      queryClient.invalidateQueries({ queryKey: ['userChallenges', user.uid] });
+      Toast.show({
+        type: 'success',
+        text1: 'Left challenge successfully'
+      });
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to leave challenge'
+      });
+    } finally {
+      setLeaveChallengeId(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, style]}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.secondary }]}>
+            Active Challenges
+          </Text>
+          <View style={[styles.addButton, { backgroundColor: colors.secondary }]} />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <LoadingSpinner />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, style]}>

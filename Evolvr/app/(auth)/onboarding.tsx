@@ -49,7 +49,6 @@ import { MaterialIcons } from '@expo/vector-icons'
 import { registrationService } from '@/backend/services/registrationService'
 import { useRegistration } from '@/hooks/auth/useRegistration'
 import { userService } from '@/backend/services/userService'
-import { CategoryLevel } from "@/backend/types/Level"
 
 // Suppress specific warnings for web
 if (Platform.OS === 'web') {
@@ -317,7 +316,6 @@ export default function OnboardingScreen() {
           try {
             userData = await userService.getUserData(user.uid);
             if (userData) {
-              console.log("User data loaded:", userData);
               await refreshUserData(user.uid);
               break;
             }

@@ -79,7 +79,6 @@ export default function Settings() {
 
     setIsDeleting(true);
     try {
-      console.log('Starting account deletion process');
       
       // Get current user
       const currentUser = auth.currentUser;
@@ -95,10 +94,8 @@ export default function Settings() {
       await reauthenticateWithCredential(currentUser, credential);
 
       // Delete account
-      console.log('Attempting to delete account for user:', user?.uid);
       if (user?.uid) {
         await userService.deleteAccount(user.uid);
-        console.log('Account deleted successfully');
         await signOut();
         router.replace('/sign-in');
       }
@@ -119,9 +116,7 @@ export default function Settings() {
   }
 
   function handleDeleteAccount() {
-    console.log('Delete account button pressed');
     if (!user?.uid) {
-      console.log('No user ID found');
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -164,7 +159,6 @@ export default function Settings() {
       title: 'Terms of Service',
       icon: 'document-text',
       onPress: () => {
-        console.log('Navigating to terms of service...');
         router.push('/(modals)/terms-of-service');
       },
     },

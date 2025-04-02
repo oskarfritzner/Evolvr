@@ -36,6 +36,7 @@ import { notificationService } from "./notificationService";
 import type { CompletedTask } from "../types/Task";
 import { auth } from "@/backend/config/firebase";
 import { useQueryClient } from "@tanstack/react-query";
+import logger from "@/utils/logger";
 
 let xpService: XPService;
 export const setXPService = (service: XPService) => {
@@ -588,6 +589,22 @@ export const routineService = {
       const routines = await this.getUserRoutines(userId);
       const routineTasks: RoutineTaskWithMeta[] = [];
 
+      // Get current day of week (0 = Sunday, 1 = Monday, etc.)
+      const currentDayOfWeek = new Date().getDay();
+
+      logger.dev("Getting active routine tasks", {
+        currentDayOfWeek,
+        dayName: [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+        ][currentDayOfWeek],
+      });
+
       for (const routine of routines) {
         if (!routine?.id || !routine.title) {
           console.warn("Invalid routine found:", routine);
@@ -609,6 +626,17 @@ export const routineService = {
         for (const task of tasksArray) {
           // Skip inactive tasks
           if (task.active === false) continue;
+
+          // Skip tasks not scheduled for today
+          if (!task.days?.includes(currentDayOfWeek)) {
+            logger.dev(`Skipping task - not scheduled for today`, {
+              taskId: task.id,
+              taskTitle: task.title,
+              scheduledDays: task.days,
+              currentDay: currentDayOfWeek,
+            });
+            continue;
+          }
 
           const today = new Date().toISOString().split("T")[0];
           const todayCompletions = (task.completions?.[today] || []).map(
@@ -671,10 +699,17 @@ export const routineService = {
                     ]
                   )
                 ),
+                days: task.days || [], // Add days to the metadata
               };
 
               // Validate the task object before adding it
               if (this.validateRoutineTask(routineTask)) {
+                logger.dev(`Adding task to active tasks`, {
+                  taskId: task.id,
+                  taskTitle: task.title,
+                  scheduledDays: task.days,
+                  currentDay: currentDayOfWeek,
+                });
                 routineTasks.push(routineTask);
               } else {
                 console.warn("Invalid routine task object:", routineTask);
@@ -686,6 +721,15 @@ export const routineService = {
           }
         }
       }
+
+      logger.dev("Filtered routine tasks", {
+        totalTasks: routineTasks.length,
+        tasksForToday: routineTasks.map((t) => ({
+          id: t.id,
+          title: t.taskName,
+          scheduledDays: t.days,
+        })),
+      });
 
       return routineTasks;
     } catch (error) {

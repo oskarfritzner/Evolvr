@@ -77,7 +77,11 @@ export default function ModalsLayout() {
         options={{
           presentation: 'modal',
           animation: 'slide_from_bottom',
-          headerShown: false,
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: colors.background,
+          },
+          headerTintColor: colors.textPrimary,
         }}
       />
       <Stack.Screen 

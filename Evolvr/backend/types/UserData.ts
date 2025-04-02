@@ -157,4 +157,12 @@ export interface UserData {
   displayNameLower: string;
 
   cachedData?: CachedData;
+
+  missedHabits?: {
+    habitId: string;
+    title: string;
+    daysMissed: number;
+    lastStreak: number;
+    timestamp: Timestamp;
+  }[];
 }

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, Platform, Keyboard, KeyboardAvoidingView } from 'react-native';
+import React, { useState, useCallback, memo } from 'react';
+import { View, StyleSheet, Pressable, ScrollView, Platform, Keyboard, KeyboardAvoidingView, Animated } from 'react-native';
 import { Surface, Text, Button, TextInput, IconButton } from 'react-native-paper';
 import { useTheme } from '@/context/ThemeContext';
 import { Goal, GoalTimeframe, GoalStatus, GoalStep } from '@/backend/types/Goal';
@@ -22,14 +22,152 @@ function generateId(): string {
   return `goal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-export function GoalSection({ 
+// Memoized goal card component
+const GoalCard = memo(({ 
+  goal, 
+  onComplete, 
+  onEdit, 
+  onDelete, 
+  timeframe, 
+  colors 
+}: { 
+  goal: Goal; 
+  onComplete: (goal: Goal) => void;
+  onEdit?: (goal: Goal) => void;
+  onDelete: (goalId: string) => void;
+  timeframe: GoalTimeframe;
+  colors: any;
+}) => (
+  <Surface
+    style={[
+      styles.goalCard, 
+      { 
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }
+    ]}
+  >
+    <View style={styles.goalCardContent}>
+      <View style={styles.goalInfo}>
+        <Text style={[styles.goalText, { 
+          color: colors.labelPrimary,
+          textDecorationLine: goal.status === GoalStatus.COMPLETED ? 'line-through' : 'none',
+        }]}>
+          {goal.description}
+        </Text>
+        {goal.measurable && (
+          <Text style={[styles.measurableText, { color: colors.labelSecondary }]}>
+            Target: {goal.measurable}
+          </Text>
+        )}
+      </View>
+      <View style={styles.goalActions}>
+        {goal.status !== GoalStatus.COMPLETED && (
+          <IconButton
+            icon="check-circle"
+            iconColor={colors.secondary}
+            size={24}
+            onPress={() => onComplete(goal)}
+          />
+        )}
+        {timeframe !== GoalTimeframe.DAILY && goal.status !== GoalStatus.COMPLETED && (
+          <IconButton
+            icon="pencil-circle"
+            iconColor={colors.labelSecondary}
+            size={24}
+            onPress={() => onEdit?.(goal)}
+          />
+        )}
+        <IconButton
+          icon="delete"
+          iconColor={colors.error}
+          size={20}
+          onPress={() => onDelete(goal.id)}
+        />
+      </View>
+    </View>
+    <View style={[styles.progressContainer, { backgroundColor: colors.surfaceContainerLow }]}>
+      <View
+        style={[
+          styles.progressBar,
+          {
+            backgroundColor: colors.surfaceContainerLow,
+          },
+        ]}
+      >
+        <Animated.View
+          style={[
+            styles.progressFill,
+            {
+              backgroundColor: goal.status === GoalStatus.COMPLETED ? colors.secondary : colors.primary,
+              width: `${goal.progress}%`,
+            },
+          ]}
+        />
+      </View>
+      <Text style={[styles.progressText, { color: colors.labelSecondary }]}>
+        {goal.progress}%
+      </Text>
+    </View>
+  </Surface>
+));
+
+// Memoized section header
+const SectionHeader = memo(({ 
+  title, 
+  timeframeInfo, 
+  isExpanded, 
+  onToggleExpand, 
+  goalsCount,
+  colors 
+}: {
+  title: string;
+  timeframeInfo: string;
+  isExpanded: boolean;
+  onToggleExpand?: () => void;
+  goalsCount: number;
+  colors: any;
+}) => (
+  <Pressable 
+    style={[
+      styles.sectionHeader, 
+      { borderBottomColor: isExpanded ? colors.border : 'transparent' }
+    ]}
+    onPress={onToggleExpand}
+  >
+    <View style={styles.sectionHeaderLeft}>
+      <View style={styles.titleContainer}>
+        <Text style={[styles.sectionTitle, { color: colors.labelPrimary }]}>
+          {title}
+        </Text>
+        <Text style={[styles.timeframeInfo, { color: colors.labelSecondary }]}>
+          {timeframeInfo}
+        </Text>
+      </View>
+      {onToggleExpand && (
+        <IconButton
+          icon={isExpanded ? "chevron-up" : "chevron-down"}
+          iconColor={colors.labelSecondary}
+          size={24}
+          style={styles.expandIcon}
+        />
+      )}
+    </View>
+    <Text style={[styles.goalCount, { color: colors.labelSecondary }]}>
+      {goalsCount} {goalsCount === 1 ? 'goal' : 'goals'}
+    </Text>
+  </Pressable>
+));
+
+const GoalSection: React.FC<GoalSectionProps> = memo(({ 
   title, 
   goals = [], 
   timeframe,
   isExpanded = true,
   onToggleExpand,
   onEditGoal
-}: GoalSectionProps) {
+}) => {
   const { colors } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -40,6 +178,23 @@ export function GoalSection({
   const [description, setDescription] = useState('');
   const [measurable, setMeasurable] = useState('');
   const [adjustingGoalId, setAdjustingGoalId] = useState<string | null>(null);
+
+  // Add animation state
+  const [animation] = useState(new Animated.Value(isExpanded ? 1 : 0));
+
+  // Update animation when expanded state changes
+  React.useEffect(() => {
+    Animated.timing(animation, {
+      toValue: isExpanded ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [isExpanded]);
+
+  const maxHeight = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   function createEmptyGoal(): Goal {
     return {
@@ -54,7 +209,49 @@ export function GoalSection({
     };
   }
 
-  const handleSubmit = async () => {
+  // Memoize handlers
+  const handleCompleteGoal = useCallback(async (goal: Goal) => {
+    if (!user?.uid) return;
+    try {
+      await goalService.updateGoalProgress(user.uid, goal.id, 100);
+      queryClient.invalidateQueries({ queryKey: ['goals', user.uid] });
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Goal completed!',
+        text2: 'Great job on achieving your goal.'
+      });
+    } catch (error) {
+      console.error('Error completing goal:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to complete goal. Please try again.'
+      });
+    }
+  }, [user?.uid]);
+
+  const handleDeleteGoal = useCallback(async (goalId: string) => {
+    if (!user?.uid) return;
+    try {
+      await goalService.deleteGoal(user.uid, goalId);
+      queryClient.invalidateQueries({ queryKey: ['goals', user.uid] });
+      Toast.show({
+        type: 'success',
+        text1: 'Goal deleted',
+        text2: 'The goal has been removed.'
+      });
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to delete goal. Please try again.'
+      });
+    }
+  }, [user?.uid]);
+
+  const handleSubmit = useCallback(async () => {
     if (!description.trim() || !user?.uid) return;
 
     try {
@@ -71,7 +268,7 @@ export function GoalSection({
       }
 
       await goalService.createGoal(user.uid, goalData);
-      await queryClient.invalidateQueries({ queryKey: ['goals', user.uid, timeframe] });
+      await queryClient.invalidateQueries({ queryKey: ['goals', user.uid] });
       
       setDescription('');
       setMeasurable('');
@@ -90,49 +287,7 @@ export function GoalSection({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleCompleteGoal = async (goal: Goal) => {
-    if (!user?.uid) return;
-
-    try {
-      await goalService.updateGoalProgress(user.uid, goal.id, 100);
-      queryClient.invalidateQueries({ queryKey: ['goals', user.uid, timeframe] });
-      
-      Toast.show({
-        type: 'success',
-        text1: 'Goal completed!',
-        text2: 'Great job on achieving your goal.'
-      });
-    } catch (error) {
-      console.error('Error completing goal:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to complete goal. Please try again.'
-      });
-    }
-  };
-
-  const handleDeleteGoal = async (goalId: string) => {
-    if (!user?.uid) return;
-    try {
-      await goalService.deleteGoal(user.uid, goalId);
-      queryClient.invalidateQueries({ queryKey: ['goals', user.uid, timeframe] });
-      Toast.show({
-        type: 'success',
-        text1: 'Goal deleted',
-        text2: 'The goal has been removed.'
-      });
-    } catch (error) {
-      console.error('Error deleting goal:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to delete goal. Please try again.'
-      });
-    }
-  };
+  }, [description, measurable, timeframe, user?.uid]);
 
   const handleAdjustGoal = (goal: Goal) => {
     setDescription(goal.description);
@@ -155,28 +310,26 @@ export function GoalSection({
   };
 
   return (
-    <Surface style={[styles.section, { backgroundColor: colors.surfaceContainer }]}>
-      <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
-        <View style={styles.sectionHeaderLeft}>
-          {onToggleExpand && (
-            <IconButton
-              icon={isExpanded ? "chevron-up" : "chevron-down"}
-              iconColor={colors.labelSecondary}
-              onPress={onToggleExpand}
-            />
-          )}
-          <View>
-            <Text style={[styles.sectionTitle, { color: colors.labelPrimary }]}>
-              {title}
-            </Text>
-            <Text style={[styles.timeframeInfo, { color: colors.labelSecondary }]}>
-              {getTimeframeInfo()}
-            </Text>
-          </View>
-        </View>
-      </View>
+    <Surface 
+      style={[
+        styles.section, 
+        { 
+          backgroundColor: colors.surfaceContainer,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }
+      ]}
+    >
+      <SectionHeader
+        title={title}
+        timeframeInfo={getTimeframeInfo()}
+        isExpanded={isExpanded}
+        onToggleExpand={onToggleExpand}
+        goalsCount={goals.length}
+        colors={colors}
+      />
 
-      {isExpanded && (
+      <Animated.View style={[styles.content, { maxHeight }]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
@@ -188,7 +341,7 @@ export function GoalSection({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.goalsListContent}
           >
-            {!isAdding && (
+            {!isAdding ? (
               <Button
                 mode="contained"
                 onPress={() => {
@@ -196,17 +349,18 @@ export function GoalSection({
                   setMeasurable('');
                   setIsAdding(true);
                 }}
-                style={styles.addButtonInSection}
-                buttonColor={colors.secondary}
-                textColor={colors.primary}
+                style={[styles.addButton, { backgroundColor: colors.secondary }]}
+                labelStyle={[styles.addButtonLabel, { color: colors.primary }]}
                 icon="plus"
               >
                 Add {title.split(' ')[0]} Goal
               </Button>
-            )}
-
-            {isAdding && (
-              <Surface style={[styles.addForm, { backgroundColor: colors.surfaceContainer }]}>
+            ) : (
+              <Surface style={[styles.addForm, { 
+                backgroundColor: colors.surfaceContainer,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }]}>
                 <TextInput
                   label="What do you want to achieve?"
                   value={description}
@@ -282,78 +436,41 @@ export function GoalSection({
             )}
 
             {goals.map((goal) => (
-              <Surface
+              <GoalCard
                 key={goal.id}
-                style={[styles.goalCard, { backgroundColor: colors.surface }]}
-              >
-                <View style={styles.goalCardContent}>
-                  <View style={styles.goalInfo}>
-                    <Text style={[styles.goalText, { color: colors.labelPrimary }]}>
-                      {goal.description}
-                    </Text>
-                    {goal.measurable && (
-                      <Text style={[styles.measurableText, { color: colors.labelSecondary }]}>
-                        Target: {goal.measurable}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={styles.goalActions}>
-                    {goal.status !== GoalStatus.COMPLETED && (
-                      <IconButton
-                        icon="check-circle"
-                        iconColor={colors.secondary}
-                        size={24}
-                        onPress={() => handleCompleteGoal(goal)}
-                      />
-                    )}
-                    {timeframe !== GoalTimeframe.DAILY && goal.status !== GoalStatus.COMPLETED && (
-                      <IconButton
-                        icon="pencil-circle"
-                        iconColor={colors.labelSecondary}
-                        size={24}
-                        onPress={() => handleAdjustGoal(goal)}
-                      />
-                    )}
-                    <IconButton
-                      icon="delete"
-                      iconColor={colors.error}
-                      size={20}
-                      onPress={() => handleDeleteGoal(goal.id)}
-                    />
-                  </View>
-                </View>
-                <View style={[styles.progressBar, { backgroundColor: colors.surfaceContainerLow }]}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        backgroundColor: colors.primary,
-                        width: `${goal.progress}%`,
-                      },
-                    ]}
-                  />
-                </View>
-              </Surface>
+                goal={goal}
+                onComplete={handleCompleteGoal}
+                onEdit={onEditGoal}
+                onDelete={handleDeleteGoal}
+                timeframe={timeframe}
+                colors={colors}
+              />
             ))}
 
             {goals.length === 0 && !isAdding && (
-              <Text style={[styles.emptyText, { color: colors.labelSecondary }]}>
-                No {title.toLowerCase()} yet. Add one to get started!
-              </Text>
+              <View style={styles.emptyStateContainer}>
+                <Text style={[styles.emptyText, { color: colors.labelSecondary }]}>
+                  No {title.toLowerCase()} yet
+                </Text>
+                <Text style={[styles.emptySubtext, { color: colors.labelSecondary }]}>
+                  Add one to get started!
+                </Text>
+              </View>
             )}
           </ScrollView>
         </KeyboardAvoidingView>
-      )}
+      </Animated.View>
     </Surface>
   );
-}
+});
+
+export default GoalSection;
 
 const styles = StyleSheet.create({
   section: {
-    borderRadius: 12,
-    marginBottom: 16,
+    borderRadius: 16,
+    marginBottom: 20,
     overflow: 'hidden',
-    flex: Platform.OS === 'ios' ? 0 : 1,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -364,18 +481,101 @@ const styles = StyleSheet.create({
   },
   sectionHeaderLeft: {
     flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: 0.15,
+  },
+  expandIcon: {
+    marginLeft: 8,
+  },
+  goalCount: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  content: {
+    overflow: 'hidden',
+  },
+  addButton: {
+    marginVertical: 16,
+    borderRadius: 12,
+    height: 48,
+  },
+  addButtonLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  goalCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  goalCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  goalInfo: {
     flex: 1,
     marginRight: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  goalText: {
+    fontSize: 16,
+    fontWeight: '500',
+    lineHeight: 24,
   },
-  addButtonInSection: {
-    marginBottom: 16,
+  measurableText: {
+    fontSize: 14,
+    marginTop: 4,
+    fontWeight: '400',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     borderRadius: 8,
-    alignSelf: 'flex-start',
+    padding: 8,
+  },
+  progressBar: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    fontWeight: '600',
+    minWidth: 45,
+    textAlign: 'right',
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  timeframeInfo: {
+    fontSize: 13,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   goalsList: {
     maxHeight: Platform.OS === 'ios' ? 'auto' : 'auto',
@@ -416,54 +616,12 @@ const styles = StyleSheet.create({
     minWidth: 100,
     borderRadius: 8,
   },
-  goalCard: {
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  goalCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  goalInfo: {
+  keyboardAvoidingView: {
     flex: 1,
-    marginRight: 16,
   },
   goalActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  measurableText: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  goalText: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  emptyText: {
-    textAlign: 'center',
-    fontSize: 14,
-    fontStyle: 'italic',
-  },
-  timeframeInfo: {
-    fontSize: 12,
-    marginTop: 2,
-    fontStyle: 'italic',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
   },
 }); 
