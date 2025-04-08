@@ -13,9 +13,9 @@
     "lint": "expo lint",
     "init-tasks": "tsx scripts/initializeTasks.ts",
     "prebuild": "cp ios/GoogleService-Info.plist ios/Evolvr/GoogleService-Info.plist",
-    "build:web": "expo export:web",
-    "predeploy": "expo export:web",
-    "deploy": "gh-pages -d web-build"
+    "build:web": "npx expo export -p web",
+    "predeploy": "npx expo export -p web",
+    "deploy": "gh-pages -d dist"
   },
   "jest": {
     "preset": "jest-expo"
