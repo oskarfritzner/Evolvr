@@ -3,42 +3,46 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { CategoryLevel } from '@/backend/types/Level';
 import CategoryProgressCard from './CategoryProgressCard';
 import { useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
-import { userService } from '@/backend/services/userService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { levelService } from '@/backend/services/levelService';
+import { useUserData } from '@/hooks/queries/useUserData';
 
 interface CategoryCardSliderProps {
   onCategoryPress: (category: string) => void;
 }
 
+const DEFAULT_CATEGORY_DATA: CategoryLevel = {
+  level: 1,
+  xp: 0
+};
+
 export default function CategoryCardSlider({ onCategoryPress }: CategoryCardSliderProps) {
   const router = useRouter();
   const { user } = useAuth();
+  const { data: userData, isLoading } = useUserData(user?.uid);
 
-  const { data: categories, isLoading } = useQuery({
-    queryKey: ['categories', user?.uid],
-    queryFn: async () => {
-      if (!user?.uid) return {};
-      const userData = await userService.getUserData(user.uid);
-      return userData?.categories || {};
-    },
-    enabled: !!user?.uid,
-  });
+  // Get categories from userData
+  const categories = userData?.categories;
 
-  if (isLoading) {
+  // Show loading spinner only if we don't have any data
+  if (isLoading && !categories) {
     return <LoadingSpinner />;
   }
 
+  // If no categories are available, don't render anything
+  if (!categories) {
+    return null;
+  }
+
   // Sort categories by progress percentage
-  const sortedCategories = Object.entries(categories || {})
-    .filter(([key]) => key !== "tasks")
+  const sortedCategories = Object.entries(categories)
+    .filter(([key]) => key !== "tasks" && !!categories[key]) // Filter out null categories
     .map(([category, data]) => ({
       category,
       data: {
-        level: data.level || 1,
-        xp: data.xp || 0
+        level: data?.level || DEFAULT_CATEGORY_DATA.level,
+        xp: data?.xp || DEFAULT_CATEGORY_DATA.xp
       }
     }))
     .sort((a, b) => {
@@ -53,6 +57,11 @@ export default function CategoryCardSlider({ onCategoryPress }: CategoryCardSlid
       params: { presentation: 'modal', animation: 'slide_from_bottom' }
     } as any);
   };
+
+  // If no sorted categories are available, don't render anything
+  if (sortedCategories.length === 0) {
+    return null;
+  }
 
   return (
     <ScrollView 

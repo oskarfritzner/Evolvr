@@ -25,7 +25,21 @@ import QuickActionsBtnsBar from '@/components/quickActions/QuickActionsBtnsBar';
 export default function Dashboard() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  console.log('[Dashboard] Auth state:', {
+    hasUser: !!user,
+    userId: user?.uid,
+    timestamp: new Date().toISOString()
+  });
+
   const { data: userData, isLoading: userLoading, error: userError } = useUserData(user?.uid);
+  console.log('[Dashboard] useUserData result:', {
+    hasUserData: !!userData,
+    userLoading,
+    userError: !!userError,
+    userId: user?.uid,
+    timestamp: new Date().toISOString()
+  });
+
   const { progress: progressData, isLoading: progressLoading } = useProgressData(user?.uid);
   const router = useRouter();
   const queryClient = useQueryClient();

@@ -94,8 +94,11 @@ export function useActiveTasks(userId?: string) {
       };
     },
     enabled: !!userId,
-    refetchInterval: 5000, // Refetch every 5 seconds
-    staleTime: 0, // Consider data always stale
+    staleTime: 1000 * 60 * 1, // Consider data fresh for 1 minute
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Log whenever tasks data changes

@@ -10,7 +10,7 @@ import { BadgeCheckParams } from "../types/Badge";
 import type { StreakService } from "../types/SharedTypes";
 import logger from "@/utils/logger";
 import Toast from "react-native-toast-message";
-import { queryClient } from "@/lib/react-query";
+import { queryClient } from "@/lib/queryClientInstance";
 import { writeBatch } from "firebase/firestore";
 import { arrayUnion } from "firebase/firestore";
 

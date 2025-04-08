@@ -1,48 +1,66 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { userService } from "@/backend/services/userService";
+import { useQuery } from "@tanstack/react-query";
 import type { UserData } from "@/backend/types/UserData";
-import { useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { userService } from "@/backend/services/userService";
 
 export function useUserData(userId: string | undefined) {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { isInitialized } = useAuth();
 
-  // Memoize the sync function
-  const syncUserData = useCallback(async () => {
-    if (!userId) return;
-    try {
-      await userService.updateUserCache(userId);
-      await queryClient.invalidateQueries({
-        queryKey: ["userData", userId],
-        exact: true,
-      });
-    } catch (error) {
-      console.error("Error syncing user data:", error);
-    }
-  }, [userId, queryClient]);
+  console.log("[useUserData] Hook initialization:", {
+    userId,
+    isInitialized,
+    timestamp: new Date().toISOString(),
+    stack: new Error().stack,
+  });
 
-  // Background sync every hour
-  useEffect(() => {
-    if (!userId) return;
-
-    // Initial sync
-    syncUserData();
-
-    const syncInterval = setInterval(syncUserData, 1000 * 60 * 60); // 1 hour
-    return () => clearInterval(syncInterval);
-  }, [userId, syncUserData]);
-
-  return useQuery({
+  const query = useQuery<UserData>({
     queryKey: ["userData", userId],
     queryFn: async () => {
-      if (!userId) throw new Error("No user ID provided");
-      return userService.getUserData(userId);
+      console.log("[useUserData] queryFn executing:", {
+        userId,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!userId) {
+        console.error("[useUserData] No userId provided to queryFn");
+        throw new Error("No userId provided to queryFn");
+      }
+
+      const data = await userService.getUserData(userId);
+
+      console.log("[useUserData] queryFn result:", {
+        userId,
+        hasData: !!data,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!data) {
+        throw new Error("No user data found");
+      }
+
+      return data;
     },
-    enabled: !!userId && !!user,
-    staleTime: 1000 * 60 * 60, // Consider data fresh for 1 hour
-    gcTime: 1000 * 60 * 60 * 24, // Keep in cache for 24 hours
-    refetchOnWindowFocus: false, // Prevent refetch on window focus
-    refetchOnReconnect: false, // Prevent refetch on reconnect
+    enabled: !!userId && isInitialized,
+    staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+    gcTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
+
+  console.log("[useUserData] Query state:", {
+    userId,
+    isSuccess: query.isSuccess,
+    isError: query.isError,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    error: query.error,
+    dataExists: !!query.data,
+    enabled: !!userId && isInitialized,
+    timestamp: new Date().toISOString(),
+  });
+
+  return query;
 }
