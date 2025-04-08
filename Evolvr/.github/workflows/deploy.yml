@@ -38,16 +38,30 @@ jobs:
           npm install --legacy-peer-deps
           npm install gh-pages --save-dev
 
+      - name: Debug environment
+        run: |
+          echo "Checking environment variables (showing only presence):"
+          echo "EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY != '' }}"
+          echo "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN != '' }}"
+          echo "EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID != '' }}"
+          echo "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET != '' }}"
+          echo "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID != '' }}"
+          echo "EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID != '' }}"
+          echo "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID != '' }}"
+
       - name: Create env file
         run: |
-          echo "EXPO_PUBLIC_FIREBASE_API_KEY=${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}" >> .env
-          echo "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}" >> .env
-          echo "EXPO_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}" >> .env
-          echo "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}" >> .env
-          echo "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}" >> .env
-          echo "EXPO_PUBLIC_FIREBASE_APP_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}" >> .env
-          echo "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID }}" >> .env
-          echo "EXPO_PUBLIC_OPENAI_API_KEY=${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}" >> .env
+          cat > .env.production << EOL
+          EXPO_PUBLIC_FIREBASE_API_KEY=${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
+          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
+          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          EXPO_PUBLIC_FIREBASE_APP_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
+          EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID }}
+          EXPO_PUBLIC_OPENAI_API_KEY=${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
+          EOL
+          cp .env.production .env
 
       - name: Build website
         env:
@@ -61,6 +75,7 @@ jobs:
           EXPO_PUBLIC_OPENAI_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
           PUBLIC_URL: /EvolvrApp
         run: |
+          echo "Building with environment variables..."
           npx expo export -p web
           touch dist/.nojekyll
           cp dist/index.html dist/404.html
