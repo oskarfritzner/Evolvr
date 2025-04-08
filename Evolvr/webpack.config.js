@@ -21,13 +21,13 @@ module.exports = async function (env, argv) {
   // Production optimizations
   if (env.mode === "production") {
     // Set the correct public path for GitHub Pages
-    config.output.publicPath = "/EvolvrApp/";
+    config.output.publicPath = "/Evolvr/";
 
     // Ensure environment variables are properly injected
     config.plugins.push(
       new webpack.DefinePlugin({
         "process.env.NODE_ENV": JSON.stringify("production"),
-        "process.env.PUBLIC_URL": JSON.stringify("/EvolvrApp"),
+        "process.env.PUBLIC_URL": JSON.stringify("/Evolvr"),
         "process.env.EXPO_PUBLIC_FIREBASE_API_KEY": JSON.stringify(
           process.env.EXPO_PUBLIC_FIREBASE_API_KEY
         ),
