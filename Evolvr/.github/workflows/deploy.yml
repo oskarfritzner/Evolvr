@@ -32,6 +32,7 @@ jobs:
         run: |
           rm -rf dist/
           rm -rf node_modules/.cache
+          rm -rf web-build/
 
       - name: Install dependencies
         run: |
@@ -51,34 +52,38 @@ jobs:
 
       - name: Create env files
         run: |
-          # Create .env.production
-          cat > .env.production << EOL
-          EXPO_PUBLIC_FIREBASE_API_KEY=${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
-          EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID }}
-          EXPO_PUBLIC_OPENAI_API_KEY=${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
-          PUBLIC_URL=/Evolvr
+          # Create .env.production with explicit quotes
+          cat > .env.production << 'EOL'
+          EXPO_PUBLIC_FIREBASE_API_KEY="${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}"
+          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN="${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}"
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID="${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}"
+          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET="${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}"
+          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}"
+          EXPO_PUBLIC_FIREBASE_APP_ID="${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}"
+          EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID="${{ secrets.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID }}"
+          EXPO_PUBLIC_OPENAI_API_KEY="${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}"
+          PUBLIC_URL="/Evolvr"
           EOL
 
-          # Create .env for build time
-          cat > .env << EOL
-          EXPO_PUBLIC_FIREBASE_API_KEY=${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
-          EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID }}
-          EXPO_PUBLIC_OPENAI_API_KEY=${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
-          PUBLIC_URL=/Evolvr
+          # Create .env with explicit quotes
+          cat > .env << 'EOL'
+          EXPO_PUBLIC_FIREBASE_API_KEY="${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}"
+          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN="${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}"
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID="${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}"
+          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET="${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}"
+          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}"
+          EXPO_PUBLIC_FIREBASE_APP_ID="${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}"
+          EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID="${{ secrets.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID }}"
+          EXPO_PUBLIC_OPENAI_API_KEY="${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}"
+          PUBLIC_URL="/Evolvr"
           EOL
+
+          echo "Content of .env file (with masked values):"
+          cat .env | sed 's/=.*$/=***/'
 
       - name: Build website
         env:
+          CI: false
           NODE_ENV: production
           PUBLIC_URL: /Evolvr
           EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
@@ -93,8 +98,18 @@ jobs:
           echo "Building with environment variables..."
           echo "PUBLIC_URL: $PUBLIC_URL"
           echo "NODE_ENV: $NODE_ENV"
-          echo "EXPO_PUBLIC_FIREBASE_API_KEY: ${EXPO_PUBLIC_FIREBASE_API_KEY:+present}"
-          npx expo export -p web
+          # Print environment variables (masked)
+          env | grep EXPO_PUBLIC | sed 's/=.*$/=***/'
+
+          # Build with explicit environment loading
+          export $(cat .env | xargs)
+          npx expo export -p web --clear
+
+          # Verify build output
+          echo "Checking build output..."
+          ls -la dist/
+
+          # Setup GitHub Pages files
           touch dist/.nojekyll
           cp dist/index.html dist/404.html
           cp assets/images/favicon.png dist/favicon.ico
