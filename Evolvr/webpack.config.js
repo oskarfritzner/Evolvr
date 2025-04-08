@@ -1,4 +1,5 @@
 const createExpoWebpackConfigAsync = require("@expo/webpack-config");
+const webpack = require("webpack");
 
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(
@@ -21,6 +22,35 @@ module.exports = async function (env, argv) {
   if (env.mode === "production") {
     // Set the correct public path for GitHub Pages
     config.output.publicPath = "/EvolvrApp/";
+
+    // Ensure environment variables are properly injected
+    config.plugins.push(
+      new webpack.DefinePlugin({
+        "process.env.NODE_ENV": JSON.stringify("production"),
+        "process.env.PUBLIC_URL": JSON.stringify("/EvolvrApp"),
+        "process.env.EXPO_PUBLIC_FIREBASE_API_KEY": JSON.stringify(
+          process.env.EXPO_PUBLIC_FIREBASE_API_KEY
+        ),
+        "process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": JSON.stringify(
+          process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN
+        ),
+        "process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID": JSON.stringify(
+          process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID
+        ),
+        "process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": JSON.stringify(
+          process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET
+        ),
+        "process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": JSON.stringify(
+          process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+        ),
+        "process.env.EXPO_PUBLIC_FIREBASE_APP_ID": JSON.stringify(
+          process.env.EXPO_PUBLIC_FIREBASE_APP_ID
+        ),
+        "process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": JSON.stringify(
+          process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
+        ),
+      })
+    );
 
     // Enable performance optimizations
     config.optimization = {
