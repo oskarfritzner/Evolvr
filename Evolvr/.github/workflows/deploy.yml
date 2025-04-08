@@ -21,10 +21,10 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18
+          cache: npm
 
       - name: Clean build directories
         run: |
-          rm -rf dist/
           rm -rf web-build/
           rm -rf node_modules/.cache
 
@@ -40,13 +40,13 @@ jobs:
       - name: Build website
         env:
           EXPO_PUBLIC_OPENAI_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
-        run: npx expo export -p web
+        run: npm run build:web
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_dir: ./web-build
           force_orphan: true
           enable_jekyll: false
           user_name: "github-actions[bot]"

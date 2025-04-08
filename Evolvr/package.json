@@ -14,8 +14,8 @@
     "init-tasks": "tsx scripts/initializeTasks.ts",
     "prebuild": "cp ios/GoogleService-Info.plist ios/Evolvr/GoogleService-Info.plist",
     "build:web": "expo export:web",
-    "predeploy": "expo export -p web",
-    "deploy": "gh-pages --nojekyll -d dist"
+    "predeploy": "expo export:web",
+    "deploy": "gh-pages -d web-build"
   },
   "jest": {
     "preset": "jest-expo"
