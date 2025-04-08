@@ -2,7 +2,7 @@
   "name": "evolvr",
   "main": "expo-router/entry",
   "version": "1.0.0",
-  "homepage": "https://oskarfritzner.github.io/EvolvrApp",
+  "homepage": "https://oskarfritzner.github.io/Evolvr",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
