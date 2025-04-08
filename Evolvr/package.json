@@ -13,8 +13,8 @@
     "lint": "expo lint",
     "init-tasks": "tsx scripts/initializeTasks.ts",
     "prebuild": "cp ios/GoogleService-Info.plist ios/Evolvr/GoogleService-Info.plist",
-    "build:web": "PUBLIC_URL=/EvolvrApp npx expo export -p web",
-    "predeploy": "PUBLIC_URL=/EvolvrApp npx expo export -p web",
+    "build:web": "NODE_ENV=production PUBLIC_URL=/EvolvrApp npx expo export -p web",
+    "predeploy": "NODE_ENV=production PUBLIC_URL=/EvolvrApp npx expo export -p web",
     "deploy": "gh-pages -d dist"
   },
   "jest": {

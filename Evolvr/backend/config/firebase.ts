@@ -62,7 +62,33 @@ const validateFirebaseConfig = () => {
 
 // Get Firebase configuration with fallback values for development
 const getFirebaseConfig = () => {
-  const config = {
+  // In production, we should not use fallback values
+  if (process.env.NODE_ENV === "production") {
+    const config = {
+      apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+      measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    };
+
+    // Validate that all required fields are present in production
+    const missingFields = Object.entries(config).filter(([_, value]) => !value);
+    if (missingFields.length > 0) {
+      console.error(
+        "Missing required Firebase configuration fields:",
+        missingFields.map(([key]) => key)
+      );
+      throw new Error("Missing required Firebase configuration fields");
+    }
+
+    return config;
+  }
+
+  // Development environment with fallback values
+  return {
     apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "development-api-key",
     authDomain:
       process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ||
@@ -80,14 +106,6 @@ const getFirebaseConfig = () => {
     measurementId:
       process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-0000000000",
   };
-
-  console.log("Firebase Config:", {
-    apiKeyPresent: !!config.apiKey,
-    authDomain: config.authDomain,
-    projectId: config.projectId,
-  });
-
-  return config;
 };
 
 let app: FirebaseApp;
