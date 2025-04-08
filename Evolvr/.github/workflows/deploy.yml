@@ -23,25 +23,21 @@ jobs:
           node-version: 18
 
       - name: Clean build directories
-        working-directory: ./Evolvr
         run: |
           rm -rf dist/
           rm -rf web-build/
           rm -rf node_modules/.cache
 
       - name: Install dependencies
-        working-directory: ./Evolvr
         run: |
           npm install --legacy-peer-deps
           npm install gh-pages --save-dev
 
       - name: Create env file
-        working-directory: ./Evolvr
         run: |
           echo "EXPO_PUBLIC_OPENAI_API_KEY=${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}" >> .env
 
       - name: Build website
-        working-directory: ./Evolvr
         env:
           EXPO_PUBLIC_OPENAI_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
         run: npx expo export -p web
@@ -50,7 +46,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./Evolvr/dist
+          publish_dir: ./dist
           force_orphan: true
           enable_jekyll: false
           user_name: "github-actions[bot]"
