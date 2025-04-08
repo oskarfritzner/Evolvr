@@ -90,7 +90,7 @@
       ]
     ],
     "experiments": {
-      "baseUrl": "/EvolvrApp",
+      "baseUrl": "/Evolvr",
       "typedRoutes": true
     },
     "extra": {

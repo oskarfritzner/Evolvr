@@ -2,7 +2,7 @@
   "name": "evolvr",
   "main": "expo-router/entry",
   "version": "1.0.0",
-  "homepage": "https://oskarfritzner.github.io/Evolvr",
+  "homepage": "https://oskarfritzner.github.io/EvolvrApp",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -13,8 +13,8 @@
     "lint": "expo lint",
     "init-tasks": "tsx scripts/initializeTasks.ts",
     "prebuild": "cp ios/GoogleService-Info.plist ios/Evolvr/GoogleService-Info.plist",
-    "build:web": "PUBLIC_URL=/Evolvr npx expo export -p web",
-    "predeploy": "PUBLIC_URL=/Evolvr npx expo export -p web",
+    "build:web": "PUBLIC_URL=/EvolvrApp npx expo export -p web",
+    "predeploy": "PUBLIC_URL=/EvolvrApp npx expo export -p web",
     "deploy": "gh-pages -d dist"
   },
   "jest": {

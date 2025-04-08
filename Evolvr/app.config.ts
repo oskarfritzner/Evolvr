@@ -59,6 +59,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: "metro",
     output: "static",
     favicon: "./assets/images/favicon.png",
+    publicPath: "/EvolvrApp",
+    build: {
+      babel: {
+        dangerouslyAddModulePathsToTranspile: ["nativewind"],
+      },
+    },
   },
   experiments: {
     baseUrl: "/EvolvrApp",
