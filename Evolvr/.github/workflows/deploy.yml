@@ -12,7 +12,7 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: github-pages
     defaults:
       run:
         working-directory: ./Evolvr
