@@ -33,6 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
     },
+    supportsTablet: true,
   },
   android: {
     intentFilters: [
@@ -59,15 +60,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: "metro",
     output: "static",
     favicon: "./assets/images/favicon.png",
-    publicPath: "/EvolvrApp",
-    build: {
-      babel: {
-        dangerouslyAddModulePathsToTranspile: ["nativewind"],
-      },
-    },
   },
+  platforms: ["ios", "android", "web"],
   experiments: {
-    baseUrl: "/EvolvrApp",
+    baseUrl: "/Evolvr",
     tsconfigPaths: true,
+    typedRoutes: true,
   },
 });

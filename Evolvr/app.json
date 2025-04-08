@@ -51,10 +51,9 @@
       ]
     },
     "web": {
-      "bundler": "webpack",
+      "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
-      "publicPath": "/Evolvr"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -90,7 +89,6 @@
       ]
     ],
     "experiments": {
-      "baseUrl": "/Evolvr",
       "typedRoutes": true
     },
     "extra": {
