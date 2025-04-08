@@ -30,15 +30,27 @@ yarn-error.*
 *.pem
 
 # local env files
-.env*.local
+.env
+.env.*
+!.env.example
+dist/
+web-build/
 
-# typescript
+# Build output
+dist/
+web-build/
+.next/
+out/
+
+# Cache
+.cache/
 *.tsbuildinfo
 
-app-example
-
-# .env
-.env
-
-#firebase.rules
+# firebase
 firebase.rules
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -1,5 +1,14 @@
 import { ExpoConfig, ConfigContext } from "expo/config";
 
+// Helper to get environment variables with fallbacks
+const getEnvVar = (key: string, fallback: string = ""): string => {
+  const value = process.env[key] || fallback;
+  if (!value && process.env.NODE_ENV === "production") {
+    console.warn(`Warning: ${key} environment variable is not set`);
+  }
+  return value;
+};
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Evolvr",
@@ -14,10 +23,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     eas: {
       projectId: "03ea9dda-605e-447e-b852-ef15db99aee4",
     },
-    OPENAI_API_KEY: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
-    AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
-    AZURE_OPENAI_API_KEY: process.env.AZURE_OPENAI_API_KEY,
-  }, // Your app's URL scheme
+    // Only expose public environment variables to the client
+    OPENAI_API_KEY: getEnvVar("EXPO_PUBLIC_OPENAI_API_KEY"),
+  },
   plugins: ["expo-secure-store", "expo-dev-client"],
   ios: {
     bundleIdentifier: "com.oskarfritzner.Evolvr",
@@ -27,7 +35,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
   },
   android: {
-    // ... other Android config
     intentFilters: [
       {
         action: "VIEW",
@@ -52,5 +59,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: "metro",
     output: "static",
     favicon: "./assets/images/favicon.png",
+  },
+  experiments: {
+    baseUrl: "/EvolvrApp",
   },
 });

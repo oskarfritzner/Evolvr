@@ -51,7 +51,7 @@
       ]
     },
     "web": {
-      "bundler": "metro",
+      "bundler": "webpack",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
@@ -89,6 +89,7 @@
       ]
     ],
     "experiments": {
+      "baseUrl": "/EvolvrApp",
       "typedRoutes": true
     },
     "extra": {
