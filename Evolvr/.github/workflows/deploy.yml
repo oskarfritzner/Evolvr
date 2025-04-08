@@ -13,6 +13,10 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     environment: production
+    defaults:
+      run:
+        working-directory: ./Evolvr
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -22,6 +26,7 @@ jobs:
         with:
           node-version: 18
           cache: npm
+          cache-dependency-path: ./Evolvr/package-lock.json
 
       - name: Clean build directories
         run: |
@@ -50,7 +55,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_dir: ./Evolvr/dist
           force_orphan: true
           enable_jekyll: false
           user_name: "github-actions[bot]"
