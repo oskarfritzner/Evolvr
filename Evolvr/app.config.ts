@@ -62,5 +62,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   experiments: {
     baseUrl: "/EvolvrApp",
+    tsconfigPaths: true,
   },
 });
