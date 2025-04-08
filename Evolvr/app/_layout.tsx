@@ -1,5 +1,5 @@
-import React from "react";
-import { Stack } from "expo-router";
+import React, { useEffect } from "react";
+import { Stack, SplashScreen } from "expo-router";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -14,6 +14,9 @@ import { initializeServices } from '@/backend/services/initServices';
 import { ClientSideLayoutEffect } from '@/components/layout/ClientSideLayoutEffect';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { LogBox } from "react-native";
+
+// Prevent the splash screen from auto-hiding
+SplashScreen.preventAutoHideAsync();
 
 // Initialize services
 initializeServices();
@@ -47,6 +50,11 @@ function ClientSideToast() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Hide the splash screen once everything is initialized
+    SplashScreen.hideAsync();
+  }, []);
+
   return (
     <ClientSideLayoutEffect
       effect={() => {
