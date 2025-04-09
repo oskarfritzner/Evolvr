@@ -178,13 +178,62 @@ export const notificationService = {
     }
   },
 
-  subscribeToUnreadCount(userId: string) {
-    const notificationsRef = collection(db, `users/${userId}/notifications`);
-    const q = query(notificationsRef, where("read", "==", false));
+  subscribeToUnreadCount: (
+    userId: string,
+    options = { debounceTime: 1000 }
+  ) => {
+    let timeout: NodeJS.Timeout;
 
-    return onSnapshot(q, (snapshot) => {
-      // Just return the count, let the UI handle updates
-      return snapshot.size;
-    });
+    // Add initial delay for auth token propagation
+    const setupTimerId = setTimeout(() => {
+      try {
+        const notificationsRef = collection(
+          db,
+          `users/${userId}/notifications`
+        );
+        const q = query(notificationsRef, where("read", "==", false));
+
+        const unsubscribe = onSnapshot(q, {
+          next: (snapshot) => {
+            // Clear any pending timeout
+            if (timeout) clearTimeout(timeout);
+
+            // Set a new timeout to debounce the updates
+            timeout = setTimeout(() => {
+              // Count unread notifications
+              const unreadCount = snapshot.docs.length;
+
+              // Update user's unread notification count
+              const userRef = doc(db, "users", userId);
+              updateDoc(userRef, {
+                unreadNotifications: unreadCount,
+              }).catch((err) => {
+                console.error("Error updating unread count:", err);
+              });
+            }, options.debounceTime);
+          },
+          error: (error) => {
+            console.error("Notification listener error:", error);
+            // Don't retry on error - just log it
+            // This service is non-critical
+          },
+        });
+
+        // Return combined cleanup function
+        return () => {
+          if (timeout) clearTimeout(timeout);
+          unsubscribe();
+        };
+      } catch (error) {
+        console.error("Error setting up notification listener:", error);
+        return () => {}; // Return empty function on error
+      }
+    }, 2000); // 2 second delay for auth propagation
+
+    // Return function that cleans up the setup timer if component unmounts before listener is established
+    return () => {
+      clearTimeout(setupTimerId);
+      if (timeout) clearTimeout(timeout);
+    };
   },
 };

@@ -79,8 +79,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     queryClient.setQueryData(["userData", userId], newUserData);
   }, [queryClient]);
 
-  // Setup Firestore listener with retry mechanism
-  const setupUserDataListener = useCallback(async (userId: string, retries = 3) => {
+  // Setup Firestore listener with retry mechanism and delay
+  const setupUserDataListener = useCallback(async (userId: string, retries = 3, delay = 1000) => {
     try {
       // Check if we have a valid auth state
       const currentUser = auth.currentUser;
@@ -88,6 +88,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         logger.warn('Attempting to setup listener without auth');
         return;
       }
+
+      // Add initial delay to ensure token propagation
+      await new Promise(resolve => setTimeout(resolve, delay));
 
       if (unsubscribeUserData) {
         unsubscribeUserData();
@@ -102,7 +105,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         updateUserDataState(initialData, userId);
       }
 
-      // Then set up the real-time listener
+      // Then set up the real-time listener with exponential backoff on error
       const unsubUserData = onSnapshot(
         userRef,
         {
@@ -115,9 +118,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
           error: async (error) => {
             logger.error('User data listener error:', error);
             if (error.code === 'permission-denied' && retries > 0) {
-              // Wait for a short delay and retry
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              setupUserDataListener(userId, retries - 1);
+              // Wait with exponential backoff and retry
+              const backoffDelay = Math.min(delay * 2, 10000); // Max 10 seconds
+              await new Promise(resolve => setTimeout(resolve, backoffDelay));
+              setupUserDataListener(userId, retries - 1, backoffDelay);
+            } else if (retries <= 0) {
+              logger.warn('Maximum retry attempts reached for user data listener');
+              // Consider notifying the user or implementing fallback behavior
+            } else {
+              logger.error(`Unhandled listener error: ${error.code}`);
             }
           }
         }
@@ -127,8 +136,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       logger.error('Error setting up user data listener:', error);
       if (retries > 0) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setupUserDataListener(userId, retries - 1);
+        const backoffDelay = Math.min(delay * 2, 10000); // Max 10 seconds
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+        setupUserDataListener(userId, retries - 1, backoffDelay);
+      } else {
+        logger.warn('Maximum retry attempts reached while setting up listener');
+        // Consider implementing fallback behavior here
       }
     }
   }, [unsubscribeUserData, updateUserDataState]);
@@ -159,16 +172,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
               // Set up real-time listener only after we have initial data
               await setupUserDataListener(firebaseUser.uid);
               
-              // Set up notifications listener
+              // Add debouncing for notification updates
               if (unsubscribeNotifications) {
                 unsubscribeNotifications();
               }
-              const unsubNotifications = notificationService.subscribeToUnreadCount(firebaseUser.uid);
+              const unsubNotifications = notificationService.subscribeToUnreadCount(
+                firebaseUser.uid,
+                // Add debounce time to prevent rapid updates
+                { debounceTime: 1000 }
+              );
               setUnsubscribeNotifications(() => unsubNotifications);
 
-              // Navigate to dashboard if not already there
-              if (router.canGoBack()) {
-                router.replace("/(tabs)/dashboard");
+              // Only redirect to dashboard on initial auth or when coming from auth screens
+              // This prevents the constant redirects during normal navigation
+              const isFromAuthOrInitial = !router.canGoBack() || pendingNavigation === "/(tabs)/dashboard";
+              
+              if (isFromAuthOrInitial) {
+                // Wrap navigation in a microtask to ensure root layout is mounted
+                setTimeout(() => {
+                  router.replace("/(tabs)/dashboard");
+                }, 0);
+              }
+              // Reset pending navigation after use
+              if (pendingNavigation) {
+                setPendingNavigation(null);
               }
             } else {
               // Handle incomplete user registration
@@ -182,7 +209,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 };
                 setRegistrationData(registrationData);
                 queryClient.setQueryData(['registrationData'], registrationData);
-                router.replace("/onboarding");
+                setTimeout(() => {
+                  router.replace("/onboarding");
+                }, 0);
               } else {
                 // No user data and not in onboarding - sign out
                 await signOut();
@@ -193,7 +222,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setUser(null);
             setUserData(null);
             queryClient.clear(); // Clear all React Query cache on sign out
-            router.replace("/sign-in");
+            setTimeout(() => {
+              router.replace("/sign-in");
+            }, 0);
           }
           
           setIsInitialized(true);
@@ -206,7 +237,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(null);
           setUserData(null);
           queryClient.clear();
-          router.replace("/sign-in");
+          setTimeout(() => {
+            router.replace("/sign-in");
+          }, 0);
         }
       });
     };
@@ -247,8 +280,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Finally, sign out from Firebase
       await firebaseSignOut(auth);
       
-      // Navigate after everything is cleared
-      router.replace("/sign-in");
+      // Use a more reliable navigation approach
+      if (router.canGoBack()) {
+        router.replace("/sign-in");
+      } else {
+        // If we can't go back, we're likely at the root
+        // Use a small delay to ensure layout is mounted
+        requestAnimationFrame(() => {
+          router.replace("/sign-in");
+        });
+      }
     } catch (error) {
       logger.error('Error signing out:', error);
       throw error;
@@ -262,17 +303,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(true);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
-      // Immediately set basic user state
-      setUser({
-        uid: userCredential.user.uid,
-        userData: null
-      });
+      // Add a delay before setting up listeners to ensure token propagation
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Get user data
       const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data() as UserData;
         updateUserDataState(userData, userCredential.user.uid);
+        
+        // Set up listeners after delay
+        await setupUserDataListener(userCredential.user.uid);
+        
+        // Navigate to dashboard on successful sign in - use setTimeout to prevent timing issues
+        setTimeout(() => {
+          router.replace("/(tabs)/dashboard");
+        }, 0);
       } else {
         // Check if user is in incomplete registration
         const incompleteUser = await registrationService.get(userCredential.user.uid);
@@ -285,17 +331,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           };
           setRegistrationData(registrationData);
           queryClient.setQueryData(['registrationData'], registrationData);
-          router.replace("/onboarding");
-          return userCredential.user;
+          setTimeout(() => {
+            router.replace("/onboarding");
+          }, 0);
         }
       }
 
-      // Set up listeners after successful sign in
-      await setupUserDataListener(userCredential.user.uid);
-      
-      // Navigate to dashboard on successful sign in
-      router.replace("/(tabs)/dashboard");
-      
       return userCredential.user;
     } catch (error) {
       logger.error('Sign in error:', error);

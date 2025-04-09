@@ -13,9 +13,10 @@ interface RoutineCardProps {
   routine: Routine
   onPress: () => void
   onDelete: () => void
+  compact?: boolean
 }
 
-export default function RoutineCard({ routine, onPress, onDelete }: RoutineCardProps) {
+export default function RoutineCard({ routine, onPress, onDelete, compact }: RoutineCardProps) {
   const { colors } = useTheme()
   const { user } = useAuth()
   const [participants, setParticipants] = useState<ParticipantData[]>([])
@@ -27,8 +28,14 @@ export default function RoutineCard({ routine, onPress, onDelete }: RoutineCardP
 
   useEffect(() => {
     const loadParticipants = async () => {
-      const participantData = await routineService.getParticipants(routine.participants);
-      setParticipants(participantData);
+      try {
+        const participantData = await routineService.getParticipants(routine.participants);
+        setParticipants(participantData);
+      } catch (error) {
+        console.error('Error loading participants:', error);
+        // Set empty array on error to prevent undefined issues
+        setParticipants([]);
+      }
     };
     loadParticipants();
   }, [routine.participants]);
@@ -59,11 +66,11 @@ export default function RoutineCard({ routine, onPress, onDelete }: RoutineCardP
         <View style={styles.leftContent}>
           <View style={styles.titleContainer}>
             <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1}>
-              {routine.title}
+              {routine.title || "Untitled Routine"}
             </Text>
           </View>
           
-          {routine.description && (
+          {routine.description ? (
             <View style={styles.descriptionContainer}>
               <Text 
                 style={[styles.description, { color: colors.textSecondary }]} 
@@ -74,28 +81,42 @@ export default function RoutineCard({ routine, onPress, onDelete }: RoutineCardP
                   : routine.description}
               </Text>
             </View>
+          ) : (
+            <View style={styles.descriptionContainer}>
+              <Text style={[styles.description, { color: colors.textSecondary }]}>
+                No description provided
+              </Text>
+            </View>
           )}
           
           <View style={styles.participants}>
-            {participants.slice(0, 3).map((participant, index) => (
-              <Image 
-                key={`${participant.id}-${index}`}
-                source={{ uri: participant.photoURL || 'https://via.placeholder.com/32' }}
-                style={[
-                  styles.participantImage, 
-                  { 
-                    marginLeft: index > 0 ? -8 : 0,
-                    borderColor: colors.surface
-                  }
-                ]}
-              />
-            ))}
-            {participants.length > 3 && (
-              <View style={[styles.moreParticipants, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.moreParticipantsText, { color: colors.surface }]}>
-                  +{participants.length - 3}
-                </Text>
-              </View>
+            {participants && participants.length > 0 ? (
+              <>
+                {participants.slice(0, 3).map((participant, index) => (
+                  <Image 
+                    key={`${participant.id || index}-${index}`}
+                    source={{ uri: participant.photoURL || 'https://via.placeholder.com/32' }}
+                    style={[
+                      styles.participantImage, 
+                      { 
+                        marginLeft: index > 0 ? -8 : 0,
+                        borderColor: colors.surface
+                      }
+                    ]}
+                  />
+                ))}
+                {participants.length > 3 && (
+                  <View style={[styles.moreParticipants, { backgroundColor: colors.secondary }]}>
+                    <Text style={[styles.moreParticipantsText, { color: colors.surface }]}>
+                      +{participants.length - 3}
+                    </Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <Text style={[styles.noParticipants, { color: colors.textSecondary }]}>
+                No participants
+              </Text>
             )}
           </View>
         </View>
@@ -129,19 +150,23 @@ export default function RoutineCard({ routine, onPress, onDelete }: RoutineCardP
         </View>
       </View>
 
-      <RoutineStatsModal
-        visible={showStats}
-        onClose={() => setShowStats(false)}
-        routine={routine}
-        participants={participants}
-      />
+      {showStats && (
+        <RoutineStatsModal
+          visible={showStats}
+          onClose={() => setShowStats(false)}
+          routine={routine}
+          participants={participants || []}
+        />
+      )}
 
-      <LeaveRoutineModal
-        visible={showLeaveModal}
-        onClose={() => setShowLeaveModal(false)}
-        onLeave={handleLeave}
-        routineTitle={routine.title}
-      />
+      {showLeaveModal && (
+        <LeaveRoutineModal
+          visible={showLeaveModal}
+          onClose={() => setShowLeaveModal(false)}
+          onLeave={handleLeave}
+          routineTitle={routine.title || "This routine"}
+        />
+      )}
     </TouchableOpacity>
   )
 }
@@ -208,6 +233,10 @@ const styles = StyleSheet.create({
   moreParticipantsText: {
     fontSize: 10,
     fontWeight: '600',
+  },
+  noParticipants: {
+    fontSize: 12,
+    fontStyle: 'italic',
   },
   title: Platform.select({
     web: {

@@ -1,13 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { routineService } from "@/backend/services/routineServices";
 import type { Routine } from "@/backend/types/Routine";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { collection, query, onSnapshot, where } from "firebase/firestore";
 import { db } from "@/backend/config/firebase";
 import { View } from "react-native";
+import { FirebaseError } from "firebase/app";
 
 export function useRoutines(userId: string | undefined) {
   const queryClient = useQueryClient();
+  const [listenerError, setListenerError] = useState<string | null>(null);
 
   const {
     data: routines = [],
@@ -54,22 +56,70 @@ export function useRoutines(userId: string | undefined) {
     },
   });
 
-  // Add real-time listener
+  // Add real-time listener with delay and error handling
   useEffect(() => {
     if (!userId) return;
 
-    const q = query(
-      collection(db, "routines"),
-      where("participants", "array-contains", userId)
-    );
+    let unsubscribe: (() => void) | undefined;
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      // Force refetch of both routines and active tasks
-      queryClient.invalidateQueries({ queryKey: ["routines", userId] });
-      queryClient.invalidateQueries({ queryKey: ["activeTasks", userId] });
-    });
+    const setupListener = () => {
+      // Delay setting up the listener to ensure token propagation
+      setTimeout(() => {
+        try {
+          const q = query(
+            collection(db, "routines"),
+            where("participants", "array-contains", userId)
+          );
 
-    return () => unsubscribe();
+          unsubscribe = onSnapshot(
+            q,
+            (snapshot) => {
+              // Force refetch of both routines and active tasks
+              queryClient.invalidateQueries({ queryKey: ["routines", userId] });
+              queryClient.invalidateQueries({
+                queryKey: ["activeTasks", userId],
+              });
+              setListenerError(null);
+            },
+            (error) => {
+              // Handle errors
+              console.error("Routines listener error:", error);
+              if (
+                error instanceof FirebaseError &&
+                error.code === "permission-denied"
+              ) {
+                setListenerError(
+                  "Permission denied error in routines listener"
+                );
+
+                // Retry with exponential backoff
+                if (retryCount < maxRetries) {
+                  retryCount++;
+                  const delay = Math.min(1000 * 2 ** retryCount, 10000);
+                  setTimeout(() => {
+                    if (unsubscribe) {
+                      unsubscribe();
+                      unsubscribe = undefined;
+                    }
+                    setupListener();
+                  }, delay);
+                }
+              }
+            }
+          );
+        } catch (err) {
+          console.error("Error setting up routines listener:", err);
+        }
+      }, 1500); // Delay 1.5s for token propagation
+    };
+
+    setupListener();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [userId, queryClient]);
 
   return {
@@ -80,5 +130,6 @@ export function useRoutines(userId: string | undefined) {
     updateRoutine: updateRoutineMutation.mutate,
     isCreating: createRoutineMutation.isPending,
     isUpdating: updateRoutineMutation.isPending,
+    listenerError,
   };
 }

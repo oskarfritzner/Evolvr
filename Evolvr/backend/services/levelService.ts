@@ -13,6 +13,7 @@ import Toast from "react-native-toast-message";
 import { queryClient } from "@/lib/queryClientInstance";
 import { writeBatch } from "firebase/firestore";
 import { arrayUnion } from "firebase/firestore";
+import { Timestamp } from "firebase/firestore";
 
 const XP_PER_LEVEL = 1000;
 const MAX_LEVEL = 100;
@@ -333,6 +334,78 @@ export const levelService = {
     };
   },
 
+  // Ensure user has a lastXPReset field and check if XP needs to be reset for a new day
+  async ensureXPReset(userId: string, userData: UserData): Promise<UserData> {
+    try {
+      const userRef = doc(db, "users", userId);
+      let updatedUserData = { ...userData };
+      let needsUpdate = false;
+
+      // Check if the lastXPReset field exists
+      if (!userData.stats?.lastXPReset) {
+        logger.info(
+          `Adding missing lastXPReset field for user: ${userId} and resetting todayXP`
+        );
+
+        if (!updatedUserData.stats) {
+          updatedUserData.stats = {
+            totalTasksCompleted: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            routinesCompleted: 0,
+            habitsCompleted: [],
+            challengesCompleted: [],
+            totalChallengesJoined: 0,
+            badgesEarned: [],
+            todayXP: 0, // Force reset to 0 when adding the field for the first time
+            todayCompletedTasks: [],
+            lastXPReset: Timestamp.now(),
+            routineStreaks: userData.stats?.routineStreaks || {},
+            habitStreaks: userData.stats?.habitStreaks || {},
+          };
+        } else {
+          updatedUserData.stats.lastXPReset = Timestamp.now();
+          updatedUserData.stats.todayXP = 0; // Force reset to 0 when adding the field for the first time
+          updatedUserData.stats.todayCompletedTasks = [];
+        }
+        needsUpdate = true;
+      } else {
+        // Check if the day has changed since lastXPReset
+        const lastResetDate = userData.stats.lastXPReset.toDate();
+        const today = new Date();
+
+        // Compare dates by converting to date strings (removes time component)
+        if (lastResetDate.toDateString() !== today.toDateString()) {
+          logger.info(
+            `Resetting todayXP for user: ${userId} (new day detected)`
+          );
+
+          // Reset todayXP and update lastXPReset
+          updatedUserData.stats.todayXP = 0;
+          updatedUserData.stats.lastXPReset = Timestamp.now();
+          updatedUserData.stats.todayCompletedTasks = [];
+          needsUpdate = true;
+        }
+      }
+
+      // Update user data if needed
+      if (needsUpdate) {
+        await updateDoc(userRef, {
+          stats: updatedUserData.stats,
+        });
+
+        // Invalidate user data queries
+        queryClient.invalidateQueries({ queryKey: ["userData", userId] });
+      }
+
+      return updatedUserData;
+    } catch (error) {
+      logger.error("Error in ensureXPReset:", error);
+      // Return original userData if there's an error, to prevent blocking other operations
+      return userData;
+    }
+  },
+
   // Update the addXP function to handle the new multiplier logic
   async addXP(
     userId: string,
@@ -347,7 +420,10 @@ export const levelService = {
     try {
       const userRef = doc(db, "users", userId);
       const userDoc = await getDoc(userRef);
-      const userData = userDoc.data() as UserData;
+      let userData = userDoc.data() as UserData;
+
+      // Ensure lastXPReset exists and check for day change
+      userData = await this.ensureXPReset(userId, userData);
 
       // Normalize category names to lowercase
       let normalizedXpGains = Object.entries(xpGains).reduce(

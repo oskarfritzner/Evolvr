@@ -21,6 +21,7 @@ import { postService } from "./postService";
 import { usernameService } from "./usernameService";
 import logger from "@/utils/logger";
 import Toast from "react-native-toast-message";
+import { levelService } from "./levelService";
 
 export const userService = {
   createUserData(data: Partial<UserData>) {
@@ -135,7 +136,7 @@ export const userService = {
         return null;
       }
 
-      const userData = userDoc.data() as UserData;
+      let userData = userDoc.data() as UserData;
 
       // Check if cache needs updating (older than 1 hour)
       const cacheAge = userData.cachedData?.lastUpdated
@@ -148,6 +149,32 @@ export const userService = {
         this.updateUserCache(userId).catch((error) => {
           throw error;
         });
+      }
+
+      // Ensure lastXPReset exists and check if todayXP needs to be reset
+      try {
+        const updatedUserData = await levelService.ensureXPReset(
+          userId,
+          userData
+        );
+
+        // If the user data was updated (XP was reset), fetch the latest data
+        if (
+          updatedUserData.stats?.todayXP !== userData.stats?.todayXP ||
+          !userData.stats?.lastXPReset
+        ) {
+          logger.info(
+            `XP reset occurred for user: ${userId}, fetching fresh data`
+          );
+          // Fetch the latest data
+          const refreshedDoc = await getDoc(userRef);
+          userData = refreshedDoc.data() as UserData;
+        } else {
+          userData = updatedUserData;
+        }
+      } catch (xpResetError) {
+        logger.warn("Error in XP reset check:", xpResetError);
+        // Continue with the original userData if there's an error
       }
 
       return userData;

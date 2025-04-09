@@ -6,19 +6,7 @@ import ActiveTasksList from "@/components/tasks/activeTasksList";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserData } from "@/hooks/queries/useUserData";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// Create a client with shorter stale times
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1, // Reduce retry attempts
-      staleTime: 1000, // 1 second
-      gcTime: 5 * 60 * 1000, // 5 minutes
-    },
-  },
-});
 
 function EvolveContent() {
   const { colors } = useTheme();
@@ -63,8 +51,6 @@ function EvolveContent() {
 
 export default function Evolve() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <EvolveContent />
-    </QueryClientProvider>
+    <EvolveContent />
   );
 }

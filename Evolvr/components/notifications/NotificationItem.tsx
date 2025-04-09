@@ -212,17 +212,18 @@ export default function Notification({
     }
   };
 
+  const touchableStyles = [
+    styles.container,
+    { 
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    !notification.read && [styles.unread, { borderLeftColor: colors.primary }],
+  ];
+  
   return (
     <TouchableOpacity
-      style={[
-        styles.container,
-        { 
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          pointerEvents: isRespondableNotification(notification) && notification.responded ? 'none' : 'auto'
-        },
-        !notification.read && [styles.unread, { borderLeftColor: colors.primary }],
-      ]}
+      style={touchableStyles}
       onPress={isRespondableNotification(notification) && notification.responded ? undefined : onPress}
       disabled={isRespondableNotification(notification) && notification.responded}
       activeOpacity={isRespondableNotification(notification) && notification.responded ? 1 : 0.7}

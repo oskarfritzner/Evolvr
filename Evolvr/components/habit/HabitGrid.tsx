@@ -4,7 +4,7 @@ import HabitItem from './HabitItem';
 import MissedHabitsAlert from './MissedHabitsAlert';
 import { MotiView } from 'moti';
 import { useAuth } from '@/context/AuthContext';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { habitService } from '@/backend/services/habitService';
 import Toast from 'react-native-toast-message';
 import { Habit } from '@/backend/types/Habit';
@@ -13,20 +13,15 @@ import { UserData } from '@/backend/types/UserData';
 interface HabitGridProps {
   habits: Habit[];
   onRefresh?: () => void;
+  missedHabits?: UserData['missedHabits'];
 }
 
-export default function HabitGrid({ habits, onRefresh }: HabitGridProps) {
+export default function HabitGrid({ habits, onRefresh, missedHabits = [] }: HabitGridProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [showMissedAlert, setShowMissedAlert] = useState(true);
   const [lastCheckTimestamp, setLastCheckTimestamp] = useState<number>(0);
-
-  // Query for user data to get missed habits
-  const { data: userData } = useQuery<UserData>({
-    queryKey: ['userData', user?.uid],
-    enabled: !!user?.uid,
-  });
   
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -98,12 +93,12 @@ export default function HabitGrid({ habits, onRefresh }: HabitGridProps) {
   return (
     <>
       {/* Show missed habits alert if there are any and not dismissed */}
-      {showMissedAlert && userData?.missedHabits && userData.missedHabits.length > 0 && (
+      {showMissedAlert && missedHabits && missedHabits.length > 0 ? (
         <MissedHabitsAlert
-          missedHabits={userData.missedHabits}
+          missedHabits={missedHabits}
           onDismiss={handleDismissMissedAlert}
         />
-      )}
+      ) : null}
 
       <ScrollView
         refreshControl={

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { CategoryLevel } from '@/backend/types/Level';
 import CategoryProgressCard from './CategoryProgressCard';
@@ -17,7 +17,7 @@ const DEFAULT_CATEGORY_DATA: CategoryLevel = {
   xp: 0
 };
 
-export default function CategoryCardSlider({ onCategoryPress }: CategoryCardSliderProps) {
+const CategoryCardSlider = React.memo(({ onCategoryPress }: CategoryCardSliderProps) => {
   const router = useRouter();
   const { user } = useAuth();
   const { data: userData, isLoading } = useUserData(user?.uid);
@@ -36,27 +36,26 @@ export default function CategoryCardSlider({ onCategoryPress }: CategoryCardSlid
   }
 
   // Sort categories by progress percentage
-  const sortedCategories = Object.entries(categories)
-    .filter(([key]) => key !== "tasks" && !!categories[key]) // Filter out null categories
-    .map(([category, data]) => ({
-      category,
-      data: {
-        level: data?.level || DEFAULT_CATEGORY_DATA.level,
-        xp: data?.xp || DEFAULT_CATEGORY_DATA.xp
-      }
-    }))
-    .sort((a, b) => {
-      const progressA = levelService.getCategoryLevelProgress(a.data.xp, a.data.level);
-      const progressB = levelService.getCategoryLevelProgress(b.data.xp, b.data.level);
-      return progressB - progressA;
-    });
+  const sortedCategories = useMemo(() => {
+    return Object.entries(categories)
+      .filter(([key]) => key !== "tasks" && !!categories[key]) // Filter out null categories
+      .map(([category, data]) => ({
+        category,
+        data: {
+          level: data?.level || DEFAULT_CATEGORY_DATA.level,
+          xp: data?.xp || DEFAULT_CATEGORY_DATA.xp
+        }
+      }))
+      .sort((a, b) => {
+        const progressA = levelService.getCategoryLevelProgress(a.data.xp, a.data.level);
+        const progressB = levelService.getCategoryLevelProgress(b.data.xp, b.data.level);
+        return progressB - progressA;
+      });
+  }, [categories]);
 
-  const handleCategoryPress = (categoryId: string) => {
-    router.push({
-      pathname: `/(categoryPages)/${categoryId}`,
-      params: { presentation: 'modal', animation: 'slide_from_bottom' }
-    } as any);
-  };
+  const handleCategoryPress = useCallback((categoryId: string) => {
+    onCategoryPress(categoryId);
+  }, [onCategoryPress]);
 
   // If no sorted categories are available, don't render anything
   if (sortedCategories.length === 0) {
@@ -68,6 +67,7 @@ export default function CategoryCardSlider({ onCategoryPress }: CategoryCardSlid
       horizontal 
       showsHorizontalScrollIndicator={false}
       style={styles.container}
+      removeClippedSubviews={true}
     >
       {sortedCategories.map(({ category, data }) => (
         <CategoryProgressCard
@@ -79,10 +79,14 @@ export default function CategoryCardSlider({ onCategoryPress }: CategoryCardSlid
       ))}
     </ScrollView>
   );
-}
+});
+
+CategoryCardSlider.displayName = 'CategoryCardSlider';
 
 const styles = StyleSheet.create({
   container: {
     marginBottom: 24,
   },
 });
+
+export default CategoryCardSlider;

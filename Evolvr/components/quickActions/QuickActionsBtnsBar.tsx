@@ -40,7 +40,7 @@ export default function QuickActionsBtnsBar() {
                 labelStyle={{ color: colors.primary, fontSize: 12 }}
                 compact
             >
-                <Text>Journal</Text>
+                Journal
             </Button>
             <Button
                 mode="contained"
@@ -55,7 +55,7 @@ export default function QuickActionsBtnsBar() {
                 labelStyle={{ color: colors.primary, fontSize: 12 }}
                 compact
             >
-                <Text>Set Goals</Text>
+                Set Goals
             </Button>
             <Button
                 mode="contained"
@@ -70,7 +70,7 @@ export default function QuickActionsBtnsBar() {
                 labelStyle={{ color: colors.primary, fontSize: 12 }}
                 compact
             >
-                <Text>Mindset coach</Text>
+                Mindset coach
             </Button>
 
             <JournalModal

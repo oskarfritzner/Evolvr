@@ -21,6 +21,10 @@ export function useProgressData(userId?: string) {
       return await userService.getProgressData(userId);
     },
     enabled: !!userId,
+    staleTime: 1000 * 60 * 10, // 10 minutes
+    gcTime: 1000 * 60 * 15, // 15 minutes
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
   });
 
   const addProgressMutation = useMutation<
@@ -51,7 +55,10 @@ export function useProgressData(userId?: string) {
       queryClient.setQueryData(["progress", userId], context?.previousProgress);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["progress", userId] });
+      // Only invalidate if the mutation was successful
+      if (!addProgressMutation.isError) {
+        queryClient.invalidateQueries({ queryKey: ["progress", userId] });
+      }
     },
   });
 

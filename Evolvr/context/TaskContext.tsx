@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useMemo, useCallback } from 'react';
 import type Task from '@/backend/types/Task';
 import type { RoutineTaskWithMeta } from '@/backend/types/Routine';
 import type { ChallengeTask } from '@/backend/types/Challenge';
@@ -25,101 +25,157 @@ interface TaskContextType {
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  console.log('[TaskContext] Auth state:', {
-    hasUser: !!user,
-    userId: user?.uid,
-    timestamp: new Date().toISOString(),
-    stack: new Error().stack
-  });
-
-  const { data: userData, isLoading: userDataLoading, error: userDataError } = useUserData(user?.uid);
+  const { user, isInitialized } = useAuth();
   
-  console.log('[TaskContext] useUserData result:', {
-    hasUserData: !!userData,
-    userDataLoading,
-    userDataError: userDataError ? String(userDataError) : null,
-    userId: user?.uid,
-    timestamp: new Date().toISOString()
-  });
-
-  // Only enable task queries when we have user data and it's not loading
-  const shouldEnableQueries = !!user?.uid && !!userData && !userDataLoading;
+  // Memoize user ID to prevent unnecessary re-renders
+  const userId = useMemo(() => user?.uid, [user?.uid]);
   
-  console.log('[TaskContext] Task queries state:', {
-    shouldEnableQueries,
-    userId: user?.uid,
-    hasUserData: !!userData,
-    userDataLoading,
-    userDataError: userDataError ? String(userDataError) : null,
-    timestamp: new Date().toISOString()
+  // Enable queries only when we have a valid user ID AND auth is initialized
+  const shouldEnableQueries = useMemo(() => !!userId && isInitialized, [userId, isInitialized]);
+  
+  // Fetch user data first
+  const { data: userData, isLoading: userDataLoading } = useUserData(shouldEnableQueries ? userId : undefined);
+  
+  // Memoize active task IDs to prevent unnecessary re-renders
+  const activeTaskIds = useMemo(() => userData?.activeTasks || [], [userData?.activeTasks]);
+  
+  // Only enable subsequent queries when user data is loaded
+  const shouldEnableTaskQueries = useMemo(() => 
+    shouldEnableQueries && !!userData, 
+    [shouldEnableQueries, userData]
+  );
+
+  // Fetch active tasks
+  const { data: activeTasks = [], isLoading: activeTasksLoading } = useQuery({
+    queryKey: ['activeTasks', userId, activeTaskIds.length],
+    queryFn: () => taskService.getTasksByIds(activeTaskIds),
+    enabled: shouldEnableTaskQueries && activeTaskIds.length > 0,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false,
   });
 
-  const { data: activeTasks = [], isLoading: activeTasksLoading, error: activeTasksError } = useQuery({
-    queryKey: ['activeTasks', user?.uid],
-    queryFn: () => {
-      console.log('[TaskContext] Active tasks queryFn executing', {
-        userId: user?.uid,
-        hasUserData: !!userData,
-        timestamp: new Date().toISOString()
-      });
-      return taskService.getTasksByIds(userData?.activeTasks || []);
-    },
-    enabled: shouldEnableQueries,
-  });
-
+  // Fetch routine tasks
   const { data: routineTasks = [], isLoading: routineTasksLoading } = useQuery({
-    queryKey: ['routineTasks', user?.uid],
-    queryFn: () => routineService.getTodaysRoutineTasks(user!.uid),
-    enabled: shouldEnableQueries,
+    queryKey: ['routineTasks', userId],
+    queryFn: () => routineService.getTodaysRoutineTasks(userId!),
+    enabled: shouldEnableTaskQueries,
+    staleTime: 1000 * 60 * 5, // 5 minutes 
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false,
   });
 
+  // Fetch habit tasks
   const { data: habitTasks = [], isLoading: habitTasksLoading } = useQuery({
-    queryKey: ['habitTasks', user?.uid],
-    queryFn: () => habitService.getTodaysHabitTasks(user!.uid),
-    enabled: shouldEnableQueries,
+    queryKey: ['habitTasks', userId],
+    queryFn: () => habitService.getTodaysHabitTasks(userId!),
+    enabled: shouldEnableTaskQueries,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false,
   });
 
+  // Determine if user has challenges
+  const hasChallenges = useMemo(() => 
+    !!(userData?.challenges && userData.challenges.length > 0),
+    [userData?.challenges]
+  );
+
+  // Fetch challenge tasks
   const { data: challengeTasks = [], isLoading: challengeTasksLoading } = useQuery({
-    queryKey: ['challengeTasks', user?.uid],
+    queryKey: ['challengeTasks', userId, hasChallenges],
     queryFn: async () => {
-      const activeChallenges = userData?.challenges || [];
-      
-      // Get tasks for all active challenges
+      if (!userId || !userData?.challenges || !hasChallenges) return [];
+      const activeChallenges = userData.challenges;
       const allChallengeTasks = await Promise.all(
         activeChallenges.map((challenge: Challenge) => 
-          challengeService.getUserChallengeTasks(user!.uid, challenge.id)
+          challengeService.getUserChallengeTasks(userId, challenge.id)
         )
       );
-
-      // Flatten and return all challenge tasks
       return allChallengeTasks.flat();
     },
-    enabled: shouldEnableQueries,
+    enabled: shouldEnableTaskQueries && hasChallenges,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false,
   });
 
-  const removeTask = (taskId: string, type: 'normal' | 'routine' | 'habit' | 'challenge') => {
-    // Handle task removal logic if needed
-  };
+  // Memoize the remove task function
+  const removeTask = useCallback(async (taskId: string, type: 'normal' | 'routine' | 'habit' | 'challenge') => {
+    if (!userId) return;
+    
+    try {
+      switch (type) {
+        case 'normal':
+          await taskService.deleteTask(userId, taskId);
+          break;
+        case 'routine':
+          await routineService.deleteRoutine(userId, taskId);
+          break;
+        case 'habit':
+          await habitService.deleteHabit(userId, taskId);
+          break;
+        case 'challenge':
+          // Get the challenge task details from the active tasks
+          const challengeTask = challengeTasks.find(t => t.id === taskId);
+          if (!challengeTask) {
+            throw new Error('Challenge task not found');
+          }
+          await challengeService.completeChallengeTask(
+            userId,
+            taskId,
+            challengeTask.challengeId,
+            challengeTask
+          );
+          break;
+      }
+    } catch (error) {
+      console.error(`Error removing ${type} task:`, error);
+      throw error;
+    }
+  }, [userId, challengeTasks]);
+
+  // Calculate overall loading state
+  const isLoading = useMemo(() => 
+    userDataLoading || 
+    (shouldEnableTaskQueries && (
+      activeTasksLoading || 
+      routineTasksLoading || 
+      habitTasksLoading || 
+      (hasChallenges && challengeTasksLoading)
+    )),
+    [
+      userDataLoading, 
+      shouldEnableTaskQueries,
+      activeTasksLoading, 
+      routineTasksLoading, 
+      habitTasksLoading, 
+      hasChallenges,
+      challengeTasksLoading
+    ]
+  );
+
+  // Memoize the context value
+  const contextValue = useMemo(() => ({
+    activeTasks,
+    routineTasks,
+    habitTasks,
+    challengeTasks,
+    isLoading,
+    removeTask,
+  }), [activeTasks, routineTasks, habitTasks, challengeTasks, isLoading, removeTask]);
 
   return (
-    <TaskContext.Provider value={{
-      activeTasks,
-      routineTasks,
-      habitTasks,
-      challengeTasks,
-      isLoading: userDataLoading || activeTasksLoading || routineTasksLoading || habitTasksLoading || challengeTasksLoading,
-      removeTask,
-    }}>
+    <TaskContext.Provider value={contextValue}>
       {children}
     </TaskContext.Provider>
   );
 }
 
-export const useTasks = () => {
+export function useTasks() {
   const context = useContext(TaskContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useTasks must be used within a TaskProvider');
   }
   return context;
-}; 
+} 

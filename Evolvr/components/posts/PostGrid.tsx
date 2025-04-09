@@ -12,11 +12,21 @@ import CreatePost from "@/components/posts/create-post";
 import ConfirmationDialog from "../common/ConfirmationDialog";
 import { useQueryClient } from "@tanstack/react-query";
 import PostComponent from "./Post";
+import { useQuery } from '@tanstack/react-query';
 
 interface PostGridProps {
   userId?: string;  // Optional, if not provided uses current user
   isFriend?: boolean; // Whether the viewer is friends with the profile owner
 }
+
+export const usePostsQuery = (userId: string) => {
+  return useQuery({
+    queryKey: ['posts', userId],
+    queryFn: () => postService.getUserPosts(userId),
+    staleTime: 1000 * 60, // Consider data fresh for 1 minute
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
+  });
+};
 
 export default function PostGrid({ userId, isFriend }: PostGridProps) {
   const { colors } = useTheme();
@@ -49,10 +59,6 @@ export default function PostGrid({ userId, isFriend }: PostGridProps) {
       setRefreshing(false);
     }
   };
-
-  useEffect(() => {
-    loadPosts();
-  }, [user?.uid, userId, isFriend]);
 
   useFocusEffect(
     React.useCallback(() => {

@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions, Platform } from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
 import { useTheme } from '@/context/ThemeContext';
 import { BlurView } from 'expo-blur';
 import { categoryPageStyles } from '@/styles/categoryPageStyles';
+import { LineChart } from 'react-native-chart-kit';
 
 interface CategoryProgressChartProps {
   categoryId: string;
@@ -54,24 +54,31 @@ export default function CategoryProgressChart({ categoryId, color }: CategoryPro
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Last 7 days</Text>
         
         <View style={styles.chartWrapper}>
-          <LineChart
-            data={data}
-            width={screenWidth}
-            height={320}
-            chartConfig={chartConfig}
-            bezier
-            style={styles.chart}
-            withInnerLines={true}
-            withOuterLines={true}
-            withDots={true}
-            withShadow={false}
-            withVerticalLines={false}
-            withHorizontalLines={true}
-            withVerticalLabels={true}
-            withHorizontalLabels={true}
-            fromZero={true}
-            yAxisSuffix=""
-          />
+          {/* Don't render chart on web due to compatibility issues */}
+          {Platform.OS !== 'web' ? (
+            <LineChart
+              data={data}
+              width={screenWidth}
+              height={320}
+              chartConfig={chartConfig}
+              bezier
+              style={styles.chart}
+              withInnerLines={true}
+              withOuterLines={true}
+              withDots={true}
+              withShadow={false}
+              withVerticalLines={false}
+              withHorizontalLines={true}
+              withVerticalLabels={true}
+              withHorizontalLabels={true}
+              fromZero={true}
+              yAxisSuffix=""
+            />
+          ) : (
+            <View style={[styles.chart, { height: 320, backgroundColor: colors.surface }]}>
+              {/* Web fallback */}
+            </View>
+          )}
           
           <BlurView intensity={95} style={styles.overlay}>
             <Text style={[styles.overlayText, { color: colors.textPrimary }]}>

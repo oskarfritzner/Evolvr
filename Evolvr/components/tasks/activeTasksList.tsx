@@ -37,17 +37,6 @@ export default function ActiveTasksList() {
 
   logger.tasks("Tasks data updated", tasks);
 
-  logger.dev("ActiveTasksList:", { 
-    hasError: !!error,
-    isLoading,
-    taskCounts: {
-      normal: tasks?.normalTasks?.length || 0,
-      routine: tasks?.routineTasks?.length || 0,
-      habit: tasks?.habitTasks?.length || 0,
-      challenge: tasks?.challengeTasks?.length || 0
-    }
-  });
-
   const handleAddTask = () => {
     setIsAddModalVisible(true);
   };

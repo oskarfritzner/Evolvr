@@ -34,9 +34,10 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   routine?: Routine | null;
+  onRoutineCreated?: (routine: Routine) => void;
 }
 
-const CreateRoutine: React.FC<Props> = ({ visible, onClose, routine }) => {
+const CreateRoutine: React.FC<Props> = ({ visible, onClose, routine, onRoutineCreated }) => {
   // 1. Context hooks
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -48,7 +49,6 @@ const CreateRoutine: React.FC<Props> = ({ visible, onClose, routine }) => {
   const queryClient = useQueryClient();
 
   // 3. State hooks
-  const [showDayPicker, setShowDayPicker] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Partial<RoutineTask> | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -56,9 +56,9 @@ const CreateRoutine: React.FC<Props> = ({ visible, onClose, routine }) => {
   const [showAddTask, setShowAddTask] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showFriendSelector, setShowFriendSelector] = useState(false);
+  const [showDayPicker, setShowDayPicker] = useState(false);
   const [validationMessage, setValidationMessage] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<'main' | 'addTask' | 'info' | 'friendSelector'>('main');
 
   // 4. Ref hooks
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -101,6 +101,18 @@ const CreateRoutine: React.FC<Props> = ({ visible, onClose, routine }) => {
       clearRoutine();
     };
   }, [routine, user?.userData?.cachedRoutines]);
+
+  useEffect(() => {
+    if (!visible) {
+      // Reset form when modal is closed
+      setSelectedTask(null);
+      setValidationMessage('');
+      setShowAddTask(false);
+      setShowInfo(false);
+      setShowFriendSelector(false);
+      setShowDayPicker(false);
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (successMessage) {
@@ -162,9 +174,7 @@ const CreateRoutine: React.FC<Props> = ({ visible, onClose, routine }) => {
   }, [currentRoutine.tasks, updateRoutineTasks]);
 
   const handleAddRoutineTask = () => {
-    console.log('Add Task button pressed');
-    setCurrentView('addTask');
-    console.log('showAddTask set to:', true);
+    setShowAddTask(true);
   };
 
   const handleTaskSelect = async (taskId: string, days: number[]) => {
@@ -224,879 +234,657 @@ const CreateRoutine: React.FC<Props> = ({ visible, onClose, routine }) => {
     updateRoutineTasks(updatedTasks);
   };
 
-  const handleRemoveTask = (taskId: string) => {
+  const handleRemoveTask = useCallback((taskId: string) => {
     const updatedTasks = currentRoutine.tasks.filter(task => task.id !== taskId);
     updateRoutineTasks(updatedTasks);
-  };
+  }, [currentRoutine.tasks, updateRoutineTasks]);
 
-  const handleFriendSelect = (selectedIds: string[]) => {
+  const handleFriendSelect = useCallback((selectedIds: string[]) => {
     const selectedFriendData = friends.filter(friend => 
       selectedIds.includes(friend.userId)
     );
     setSelectedFriends(selectedFriendData);
-  };
+  }, [friends]);
 
-  const handleSave = async () => {
-    try {
-      if (!user?.uid) {
-        showErrorMessage('You must be logged in to create a routine');
-        return;
-      }
-
-      if (!currentRoutine.name.trim()) {
-        showErrorMessage('Please enter a routine name');
-        return;
-      }
-
-      if (currentRoutine.tasks.length === 0) {
-        showErrorMessage('Please add at least one task');
-        return;
-      }
-
-      // Prepare tasks with proper structure
-      const formattedTasks = currentRoutine.tasks.map(task => ({
-        ...task,
-        id: task.id || generateId(),
-        title: task.title,
-        active: true,
-        days: task.days || [],
-        participants: routine?.participants || [user.uid],
-        completions: task.completions || {},
-        routineId: routine?.id || '',
-        routineName: currentRoutine.name.trim(),
-        description: task.description || '',
-        categoryXp: task.categoryXp || {},
-        createdAt: task.createdAt || Timestamp.now()
-      }));
-
-      const routineData: Partial<Routine> = {
-        title: currentRoutine.name.trim(),
-        description: currentRoutine.description.trim(),
-        tasks: formattedTasks,
-        participants: routine?.participants || [user.uid],
-        active: true,
-        metadata: routine?.metadata || {
-          currentStreak: 0,
-          bestStreak: 0,
-          totalCompletions: 0,
-          lastCompleted: null
-        }
-      };
-
-      if (isEditMode && routine?.id) {
-        // Update existing routine
-        console.log('Updating routine:', routine.id);
-        
-        // If there are new friends to invite, add them to the invites array
-        if (selectedFriends.length > 0) {
-          const existingInvites = routine.invites || [];
-          const existingParticipants = routine.participants || [];
-          
-          const newInvites = selectedFriends
-            .map(f => f.userId)
-            .filter(id => 
-              !existingInvites.includes(id) && 
-              !existingParticipants.includes(id)
-            );
-            
-          if (newInvites.length > 0) {
-            routineData.invites = [...existingInvites, ...newInvites];
-            
-            // Send invites to the new friends
-            try {
-              await routineService.inviteToRoutine(routine.id, newInvites);
-            } catch (inviteError) {
-              console.error('Error sending invites:', inviteError);
-              // Continue with the update even if invites fail
-            }
-          } else {
-            // Keep existing invites if no new ones
-            routineData.invites = existingInvites;
-          }
-        } else {
-          // Keep existing invites if no friends selected
-          routineData.invites = routine.invites || [];
-        }
-
-        await updateRoutine({ 
-          routineId: routine.id, 
-          updates: routineData 
-        });
-        
-        showSuccessMessage(
-          selectedFriends.length > 0
-            ? 'Routine updated and invites sent'
-            : 'Routine updated successfully'
-        );
-      } else {
-        // Create new routine
-        routineData.invites = selectedFriends.map(f => f.userId);
-        routineData.createdBy = user.uid;
-        routineData.createdAt = Timestamp.now().toMillis();
-        
-        console.log('Creating routine with data:', routineData);
-        await createRoutine(routineData);
-        showSuccessMessage(
-          selectedFriends.length 
-            ? 'Routine created and invites sent'
-            : 'Routine created successfully'
-        );
-      }
-      
-      // Clear selected friends after successful save
-      setSelectedFriends([]);
-      onClose();
-    } catch (error) {
-      console.error('Error saving routine:', error);
-      showErrorMessage(
-        error instanceof Error 
-          ? error.message 
-          : 'Failed to save routine'
-      );
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!user?.uid || !routine?.id) return;
+  const handleTaskAdded = useCallback((task: Task) => {
+    setShowAddTask(false);
     
-    try {
-      await routineService.deleteRoutine(user.uid, routine.id);
-      queryClient.invalidateQueries({ queryKey: ["routines", user.uid] });
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Routine deleted successfully'
-      });
-      onClose();
-    } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error instanceof Error ? error.message : 'Failed to delete routine'
-      });
-    }
-  };
-
-  const handleTaskAdded = (task: Task) => {
-    if (!task) return;
-    
-    const routineTask: RoutineTask = {
-      ...task,
+    // Create a complete RoutineTask with all required properties
+    const newTask: RoutineTask = {
+      id: task.id || generateId(),
+      title: task.title,
+      description: task.description || '',
+      days: [],
+      completed: false,
       routineId: routine?.id || '',
-      routineName: currentRoutine.name,
+      routineName: currentRoutine.name || '',
       frequency: 'weekly',
       order: currentRoutine.tasks.length,
       participants: routine?.participants || [user?.uid || ''],
-      days: [0,1,2,3,4,5,6], // Default to all days, can be modified later
       createdAt: Timestamp.now(),
-      active: true,
+      createdBy: user?.uid || '',
+      categories: task.categories || [],
+      categoryXp: task.categoryXp || {},
+      tags: task.tags || [],
+      status: task.status,
     };
+    
+    const updatedTasks = [...currentRoutine.tasks, newTask];
+    updateRoutineTasks(updatedTasks);
+  }, [currentRoutine.tasks, currentRoutine.name, routine?.id, routine?.participants, user?.uid, updateRoutineTasks]);
 
-    updateRoutineTasks([...currentRoutine.tasks, routineTask]);
+  const handleSubmit = async () => {
+    // Validate the form
+    if (!currentRoutine.name.trim()) {
+      setValidationMessage('Please enter a title for your routine');
+      return;
+    }
+
+    // Check if each task has at least one day selected
+    const hasInvalidTask = currentRoutine.tasks.some(task => task.days.length === 0);
+    if (hasInvalidTask) {
+      setValidationMessage('Please select at least one day for each task');
+      return;
+    }
+
+    setValidationMessage('');
+    setIsLoading(true);
+
+    try {
+      const routineData: Partial<Routine> = {
+        title: currentRoutine.name.trim(),
+        description: currentRoutine.description.trim(),
+        tasks: currentRoutine.tasks,
+        createdBy: user?.uid || '',
+        createdAt: new Date().getTime(), // Using timestamp as number
+        participants: selectedFriends.map(f => f.userId),
+        active: true,
+        invites: selectedFriends.map(f => f.userId),
+      };
+
+      let result;
+      
+      if (isEditMode && routine?.id) {
+        // Update existing routine
+        result = await updateRoutine({
+          routineId: routine.id,
+          updates: routineData
+        });
+        
+        // Show success message
+        showSuccessMessage('Routine updated successfully');
+        Toast.show({
+          type: 'success',
+          text1: 'Routine updated successfully',
+        });
+      } else {
+        // Create new routine
+        routineData.id = generateId();
+        result = await createRoutine(routineData as Routine);
+        
+        // Show success message
+        showSuccessMessage('Routine created successfully');
+        Toast.show({
+          type: 'success',
+          text1: 'Routine created successfully',
+        });
+      }
+
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['routines', user?.uid] });
+      
+      // Notify parent component
+      if (onRoutineCreated && result) {
+        onRoutineCreated(result);
+      }
+
+      // Close modal after a brief delay
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    } catch (error) {
+      console.error('Error saving routine:', error);
+      showErrorMessage('Failed to save routine');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to save routine',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // 8. Render content based on current view
-  const renderContent = () => {
-    switch (currentView) {
-      case 'addTask':
-        return (
-          <View style={[styles.addTaskContainer, { backgroundColor: colors.background }]}>
-            <AddTask
-              visible={true}
-              onClose={() => setCurrentView('main')}
-              type="routine"
-              onTaskAdded={(task) => {
-                if (task) {
-                  handleTaskAdded(task);
-                }
-                setCurrentView('main');
-              }}
-              title="Add Task to Routine"
-              description="Select tasks to add to your routine. You can set specific days for each task later."
-            />
-          </View>
-        );
-      case 'info':
-        return (
-          <View style={[styles.addTaskContainer, { backgroundColor: colors.background }]}>
-            <InfoModal
-              visible={true}
-              onClose={() => setCurrentView('main')}
-              title={INFO_CONTENT.routine.title}
-              content={INFO_CONTENT.routine.content}
-            />
-          </View>
-        );
-      case 'friendSelector':
-        return (
-          <View style={[styles.addTaskContainer, { backgroundColor: colors.background }]}>
-            <FriendShareModal
-              visible={true}
-              onDismiss={() => setCurrentView('main')}
-              onShare={handleFriendSelect}
-              friends={friends.map(friend => ({
-                id: friend.userId,
-                name: friend.displayName,
-                avatar: friend.photoURL
-              }))}
-            />
-          </View>
-        );
-      default:
-        return (
-          <>
-            <TouchableOpacity 
-              style={styles.closeButton} 
-              onPress={onClose}
-            >
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
+  const handleFriendShare = () => {
+    setShowFriendSelector(true);
+  };
 
-            <View style={styles.titleContainer}>
-              <Text style={[styles.title, { color: colors.textPrimary }]}>
-                {routine?.id 
-                  ? isReadOnly 
-                    ? 'View Shared Routine'
-                    : 'Edit Routine'
-                  : 'Create Routine'
-                }
-              </Text>
-              <TouchableOpacity
-                onPress={() => setCurrentView('info')}
-                style={styles.infoButton}
-              >
-                <Ionicons 
-                  name="information-circle-outline" 
-                  size={24} 
-                  color={isReadOnly ? colors.textPrimary : colors.secondary} 
-                />
-              </TouchableOpacity>
-            </View>
+  // 8. Render methods
+  const renderDays = (task: RoutineTask) => {
+    return (
+      <View style={styles.daysContainer}>
+        {DAYS.map((day, index) => (
+          <TouchableOpacity
+            key={`${task.id}-${day}`}
+            style={[
+              styles.dayChip,
+              task.days.includes(index) && { backgroundColor: colors.primary }
+            ]}
+            onPress={(e) => handleDayToggle(task.id, index, e)}
+            disabled={isReadOnly}
+          >
+            <Text style={[
+              styles.dayText,
+              task.days.includes(index) && { color: colors.background }
+            ]}>
+              {day}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
 
-            <ScrollView style={[styles.scrollView, { paddingBottom: 80 }]}>
-              <Text style={[styles.instructionText, { color: colors.textSecondary }]}>
-                {isReadOnly 
-                  ? 'View routine details. Only the creator can make changes.'
-                  : isEditMode 
-                    ? 'Modify your routine by adjusting tasks and schedules. Changes will be updated for all participants.'
-                    : 'Build your perfect routine by selecting tasks and setting their schedule. Share with friends to stay accountable and motivated.'}
-              </Text>
-
-              <View style={isDesktop && styles.desktopLayout}>
-                <View style={isDesktop && styles.desktopColumn}>
-                  {/* Basic Info Section */}
-                  <View style={[styles.card, { backgroundColor: colors.surface }]}>
-                    <View style={styles.inputContainer}>
-                      <Text style={[styles.label, { color: colors.textPrimary }]}>Routine Name</Text>
-                      <TextInput
-                        style={[styles.input, { backgroundColor: colors.background, color: colors.textPrimary }]}
-                        value={currentRoutine.name}
-                        onChangeText={handleNameChange}
-                        placeholder="Enter routine name"
-                        placeholderTextColor={colors.textSecondary}
-                        editable={!isReadOnly}
-                      />
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                      <Text style={[styles.label, { color: colors.textPrimary }]}>Description</Text>
-                      <TextInput
-                        style={[styles.input, { backgroundColor: colors.background, color: colors.textPrimary }]}
-                        value={currentRoutine.description}
-                        onChangeText={handleDescriptionChange}
-                        placeholder="Enter description"
-                        placeholderTextColor={colors.textSecondary}
-                        multiline
-                        numberOfLines={3}
-                        editable={!isReadOnly}
-                      />
-                    </View>
-                  </View>
-
-                  {/* Friends Section */}
-                  <View style={[styles.card, { backgroundColor: colors.surface }]}>
-                    <Text style={[styles.label, { color: colors.textPrimary }]}>Share with Friends</Text>
-                    <TouchableOpacity 
-                      style={[styles.addFriendsButton, { backgroundColor: colors.background }]}
-                      onPress={() => setCurrentView('friendSelector')}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      disabled={isReadOnly}
-                    >
-                      <FontAwesome5 
-                        name="user-friends" 
-                        size={16} 
-                        color={isReadOnly ? colors.textPrimary : colors.secondary} 
-                      />
-                      <Text style={[styles.addFriendsText, { 
-                        color: isReadOnly ? colors.textPrimary : colors.secondary 
-                      }]}>
-                        {selectedFriends.length > 0 
-                          ? `${selectedFriends.length} friend${selectedFriends.length === 1 ? '' : 's'} selected`
-                          : 'Add Friends'}
-                      </Text>
-                    </TouchableOpacity>
-                    
-                    {selectedFriends.length > 0 && (
-                      <View style={styles.selectedFriends}>
-                        {selectedFriends.map((friend) => (
-                          <View 
-                            key={friend.userId} 
-                            style={[styles.friendChip, { backgroundColor: colors.background }]}
-                          >
-                            <Text style={[styles.friendChipText, { color: colors.textPrimary }]}>
-                              {friend.displayName}
-                            </Text>
-                            {!isReadOnly && (
-                              <TouchableOpacity
-                                onPress={() => setSelectedFriends(prev => 
-                                  prev.filter(f => f.userId !== friend.userId)
-                                )}
-                              >
-                                <FontAwesome5 name="times" size={12} color={colors.textSecondary} />
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                <View style={isDesktop && styles.desktopColumn}>
-                  {/* Tasks Section */}
-                  <View style={[styles.card, { backgroundColor: colors.surface }]}>
-                    <View style={styles.tasksSectionHeader}>
-                      <Text style={[styles.label, { color: colors.textPrimary }]}>Tasks</Text>
-                      {!isReadOnly && (
-                        <TouchableOpacity 
-                          style={[styles.addTaskButton, { backgroundColor: colors.secondary }]}
-                          onPress={handleAddRoutineTask}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.addTaskText, { color: colors.primary }]}>
-                            Add Task
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-
-                    <View style={styles.weeklySchedule}>
-                      <View style={styles.headerRow}>
-                        <View style={styles.daysHeader}>
-                          {DAYS.map((day) => (
-                            <View key={day} style={styles.dayColumn}>
-                              <Text style={[styles.dayText, { color: colors.textPrimary }]}>{day}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-
-                      <ScrollView 
-                        style={styles.tasksScrollView}
-                        showsVerticalScrollIndicator={true}
-                      >
-                        {currentRoutine.tasks.map((task) => (
-                          <View key={task.id}>
-                            <TouchableOpacity 
-                              style={styles.taskRow}
-                              onPress={() => handleTaskPress(task)}
-                            >
-                              <View style={styles.taskContentWrapper}>
-                                {/* Title row */}
-                                <View style={styles.titleRow}>
-                                  <TouchableOpacity 
-                                    onPress={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveTask(task.id);
-                                    }}
-                                    style={styles.removeButton}
-                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                    disabled={isReadOnly}
-                                  >
-                                    <FontAwesome5 
-                                      name="times-circle" 
-                                      size={16} 
-                                      color={colors.error} 
-                                    />
-                                  </TouchableOpacity>
-                                  <Text 
-                                    style={[styles.taskText, { color: colors.textPrimary }]}
-                                    numberOfLines={2}
-                                    disabled={isReadOnly}
-                                  >
-                                    {task.title}
-                                  </Text>
-                                </View>
-
-                                {/* Days row */}
-                                <View style={styles.daysRow}>
-                                  <TouchableOpacity 
-                                    style={styles.allButton}
-                                    onPress={(e) => {
-                                      e.stopPropagation();
-                                      handleSetAll(task.id);
-                                    }}
-                                    disabled={isReadOnly}
-                                  >
-                                    <Text style={[styles.allButtonText, { color: colors.textPrimary }]}>all</Text>
-                                  </TouchableOpacity>
-                                  <View style={styles.daysContainer}>
-                                    {DAYS.map((_, index) => (
-                                      <TouchableOpacity
-                                        key={index}
-                                        style={styles.dayColumn}
-                                        onPress={(e) => {
-                                          e.stopPropagation();
-                                          handleDayToggle(task.id, index, e);
-                                        }}
-                                        disabled={isReadOnly}
-                                      >
-                                        <FontAwesome5 
-                                          name="check" 
-                                          size={14}
-                                          color={task.days.includes(index) 
-                                            ? (isReadOnly ? colors.textPrimary : colors.secondary)
-                                            : colors.textSecondary
-                                          } 
-                                        />
-                                      </TouchableOpacity>
-                                    ))}
-                                  </View>
-                                </View>
-                              </View>
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </ScrollView>
-
-            {!isReadOnly && (
-              <View style={[styles.buttonContainer, { backgroundColor: colors.background }]}>
-                {validationMessage && (
-                  <Text style={[styles.errorMessage, { color: colors.error }]}>
-                    {validationMessage}
-                  </Text>
-                )}
-                {routine?.id && isCreator && (
+  const renderDayPicker = () => {
+    if (!selectedTask) return null;
+    
+    return (
+      <Modal
+        visible={showDayPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDayPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDayPicker(false)}
+        >
+          <View 
+            style={[
+              styles.dayPickerContainer,
+              { backgroundColor: colors.surface }
+            ]}
+          >
+            <Text style={[styles.dayPickerTitle, { color: colors.textPrimary }]}>
+              Select Days for {selectedTask.title}
+            </Text>
+            
+            <View style={styles.daysContainer}>
+              {DAYS.map((day, index) => {
+                const isSelected = selectedTask.days?.includes(index) || false;
+                return (
                   <TouchableOpacity
-                    style={[styles.deleteButton, { borderColor: colors.error }]}
-                    onPress={handleDelete}
-                    accessibilityLabel="Delete routine"
-                    accessibilityRole="button"
+                    key={index}
+                    style={[
+                      styles.dayChip,
+                      isSelected ? { backgroundColor: colors.secondary } : { backgroundColor: colors.surface }
+                    ]}
+                    onPress={() => handleDaySelect(index)}
                   >
-                    <Text style={[styles.buttonText, { color: colors.error }]}>
-                      Delete Routine
+                    <Text style={[
+                      styles.dayText,
+                      isSelected ? { color: colors.background } : { color: colors.secondary }
+                    ]}>
+                      {day}
                     </Text>
                   </TouchableOpacity>
-                )}
-                <TouchableOpacity 
-                  style={[
-                    styles.createButton, 
-                    { 
-                      backgroundColor: colors.secondary,
-                      opacity: validationMessage ? 0.5 : 1 
-                    }
-                  ]}
-                  onPress={() => {
-                    const message = validateRoutine();
-                    if (message) {
-                      setValidationMessage(message);
-                      return;
-                    }
-                    handleSave();
-                  }}
-                  disabled={!!validationMessage}
-                >
-                  <Text style={[styles.buttonText, { color: colors.primary }]}>
-                    {routine?.id ? 'Save Changes' : 'Create Routine'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </>
-        );
-    }
-  };
-
-  // Add validation check function
-  const validateRoutine = () => {
-    if (!currentRoutine.name.trim()) {
-      return "Please give your routine a name";
-    }
-    if (currentRoutine.tasks.length === 0) {
-      return "Add at least one task to your routine";
-    }
-    return "";
+                );
+              })}
+            </View>
+            
+            <TouchableOpacity
+              style={[styles.selectAllButton, { backgroundColor: colors.secondary }]}
+              onPress={() => {
+                if (selectedTask && selectedTask.id) {
+                  handleSetAll(selectedTask.id);
+                }
+              }}
+            >
+              <Text style={[styles.selectAllText, { color: colors.background }]}>
+                {selectedTask.days?.length === 7 ? 'Clear All' : 'Select All'}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.doneButton, { backgroundColor: colors.secondary }]}
+              onPress={() => setShowDayPicker(false)}
+            >
+              <Text style={[styles.doneText, { color: colors.background }]}>
+                Done
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
   };
 
   return (
     <Modal
+      transparent={true}
       visible={visible}
-      transparent
-      animationType="fade"
       onRequestClose={onClose}
+      animationType="slide"
     >
-      <View style={styles.overlay}>
-        <View style={[
-          styles.modalContainer, 
-          { backgroundColor: colors.background },
-          isDesktop && styles.modalContainerDesktop
-        ]}>
-          {renderContent()}
+      <View style={[styles.modalContainer, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
+        <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+          <View style={styles.modalHeader}>
+            <View style={styles.titleContainer}>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                {isEditMode ? 'Edit Routine' : 'Create Routine'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowInfo(true)} style={styles.infoButton}>
+                <Ionicons name="information-circle-outline" size={24} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
+            <View style={styles.formSection}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Basic Information</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  { 
+                    backgroundColor: colors.surface, 
+                    color: colors.textPrimary,
+                    borderColor: colors.border 
+                  }
+                ]}
+                placeholder="Routine Name"
+                placeholderTextColor={colors.textSecondary}
+                value={currentRoutine.name}
+                onChangeText={handleNameChange}
+                editable={!isReadOnly}
+              />
+              <TextInput
+                style={[
+                  styles.input, 
+                  styles.multilineInput,
+                  { 
+                    backgroundColor: colors.surface, 
+                    color: colors.textPrimary,
+                    borderColor: colors.border 
+                  }
+                ]}
+                placeholder="Description (optional)"
+                placeholderTextColor={colors.textSecondary}
+                value={currentRoutine.description}
+                onChangeText={handleDescriptionChange}
+                multiline
+                editable={!isReadOnly}
+              />
+            </View>
+
+            <View style={styles.formSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tasks</Text>
+                {!isReadOnly && (
+                  <TouchableOpacity
+                    style={[styles.addButton, { backgroundColor: colors.primary }]}
+                    onPress={handleAddRoutineTask}
+                  >
+                    <Text style={[styles.addButtonText, { color: colors.background }]}>Add Task</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {currentRoutine.tasks.length === 0 ? (
+                <View style={styles.emptyTasks}>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    No tasks added yet. Add tasks to your routine.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.tasksList}>
+                  {currentRoutine.tasks.map((task) => (
+                    <View key={task.id} style={[styles.taskItem, { backgroundColor: colors.surface }]}>
+                      <TouchableOpacity
+                        style={styles.taskContent}
+                        onPress={() => handleTaskPress(task)}
+                        disabled={isReadOnly}
+                      >
+                        <Text style={[styles.taskTitle, { color: colors.textPrimary }]}>{task.title}</Text>
+                        <View style={styles.daysContainer}>
+                          {DAYS.map((day, index) => (
+                            <TouchableOpacity
+                              key={index}
+                              style={[
+                                styles.dayChip,
+                                task.days.includes(index) 
+                                  ? { backgroundColor: colors.primary } 
+                                  : { backgroundColor: colors.surface }
+                              ]}
+                              onPress={(e) => handleDayToggle(task.id, index, e)}
+                              disabled={isReadOnly}
+                            >
+                              <Text
+                                style={[
+                                  styles.dayText,
+                                  task.days.includes(index) 
+                                    ? { color: colors.background } 
+                                    : { color: colors.textSecondary }
+                                ]}
+                              >
+                                {day}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </TouchableOpacity>
+                      
+                      {!isReadOnly && (
+                        <View style={styles.taskActions}>
+                          <TouchableOpacity 
+                            style={styles.taskActionButton}
+                            onPress={() => handleSetAll(task.id)}
+                          >
+                            <Text style={[styles.taskActionText, { color: colors.primary }]}>
+                              {task.days.length === 7 ? 'Clear All' : 'Select All'}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={styles.taskActionButton}
+                            onPress={() => handleRemoveTask(task.id)}
+                          >
+                            <Ionicons name="trash-outline" size={20} color={colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {!isReadOnly && (
+              <View style={styles.formSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Share with Friends</Text>
+                  <TouchableOpacity 
+                    style={[styles.addButton, { backgroundColor: colors.primary }]}
+                    onPress={() => setShowFriendSelector(true)}
+                  >
+                    <Text style={[styles.addButtonText, { color: colors.background }]}>
+                      {selectedFriends.length > 0 ? 'Edit Friends' : 'Select Friends'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {selectedFriends.length > 0 ? (
+                  <View style={styles.friendsList}>
+                    {selectedFriends.map((friend) => (
+                      <View key={friend.userId} style={[styles.friendChip, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.friendName, { color: colors.textPrimary }]}>{friend.displayName}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyFriends}>
+                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                      No friends selected. Select friends to share this routine with.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {validationMessage ? (
+              <Text style={[styles.validationMessage, { color: colors.error }]}>
+                {validationMessage}
+              </Text>
+            ) : null}
+
+            {!isReadOnly && (
+              <TouchableOpacity
+                style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                onPress={handleSubmit}
+                disabled={isCreating || isUpdating}
+              >
+                <Text style={[styles.saveButtonText, { color: colors.background }]}>
+                  {isCreating || isUpdating 
+                    ? 'Saving...' 
+                    : isEditMode ? 'Update Routine' : 'Create Routine'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
         </View>
       </View>
+
+      <InfoModal
+        visible={showInfo}
+        onClose={() => setShowInfo(false)}
+        title={INFO_CONTENT.routine.title}
+        content={INFO_CONTENT.routine.content}
+      />
+
+      <FriendShareModal
+        visible={showFriendSelector}
+        onDismiss={() => setShowFriendSelector(false)}
+        onShare={handleFriendSelect}
+        friends={friends.map(f => ({
+          id: f.userId,
+          name: f.displayName,
+          avatar: f.photoURL
+        }))}
+      />
+
+      <AddTask
+        visible={showAddTask}
+        onClose={() => setShowAddTask(false)}
+        type="routine"
+        onTaskAdded={(task) => {
+          if (task) {
+            handleTaskAdded(task);
+          }
+        }}
+        title="Add Task to Routine"
+        description="Select tasks to add to your routine. You can set specific days for each task later."
+      />
+
+      {renderDayPicker()}
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  modalContainer: {
     flex: 1,
-    padding: 16,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    padding: 12,
-    borderRadius: 8,
-    fontSize: 16,
-  },
-  weeklySchedule: {
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 8,
-  },
-  tasksScrollView: {
-    height: 224,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
-    paddingVertical: 8,
-    paddingLeft: 40,
-  },
-  taskColumn: {
-    flex: 2,
-    paddingRight: 16,
-  },
-  daysHeader: {
-    flex: 3,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingRight: 8,
-  },
-  daysContainer: {
-    flex: 3,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingRight: 8,
-  },
-  dayColumn: {
-    width: 32,
-    alignItems: 'center',
-    paddingVertical: 8,
-    justifyContent: 'center',
-  },
-  headerText: {
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  dayText: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  taskRow: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  taskContentWrapper: {
-    gap: 8,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: 8,
-  },
-  daysRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  allButton: {
-    width: 40,
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  allButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  removeButton: {
-    padding: 8,
-    marginRight: 4,
-  },
-  taskText: {
-    flex: 1,
-    fontSize: 14,
-  },
-  addTaskButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  addTaskText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  createButton: {
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     width: '80%',
-    padding: 20,
-    borderRadius: 12,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  dayGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  dayButton: {
-    padding: 12,
+    maxWidth: 400,
     borderRadius: 8,
-    width: '30%',
-    alignItems: 'center',
-  },
-  dayButtonText: {
-    fontWeight: '500',
-  },
-  doneButton: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  doneButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  setAllButton: {
-    padding: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  setAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  taskNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  card: {
-    borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  deleteButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  addFriendsButton: {
+  modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  addFriendsText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  selectedFriends: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-  },
-  friendChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  friendChipText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContainer: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 16,
-    width: '100%',
-    maxWidth: 600,
-    maxHeight: '90%',
-    marginVertical: 20,
-    marginHorizontal: Platform.OS === 'web' ? 20 : '5%',
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  closeButton: {
-    position: 'absolute',
-    right: 16,
-    top: 16,
-    zIndex: 1,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollView: {
-    // Add any necessary styles for the scroll view
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 1.6,
-  },
-  instructionText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  modalContainerDesktop: {
-    maxWidth: 1000,
-    maxHeight: '80%',
-  },
-  desktopLayout: {
-    flexDirection: 'row',
-    gap: 24,
-  },
-  desktopColumn: {
-    flex: 1,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
-  },
-  validationText: {
-    textAlign: 'center',
-    marginBottom: 8,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  taskContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  tasksSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginRight: 16,
   },
   infoButton: {
-    marginLeft: 8,
     padding: 4,
   },
-  addTaskContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 100,
+  closeButton: {
+    padding: 4,
   },
-  errorMessage: {
-    fontSize: 14,
-    textAlign: 'center',
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    padding: 16,
+  },
+  formSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginBottom: 8,
-    position: 'absolute',
-    top: -30,
-    left: 16,
-    right: 16,
   },
-  readOnlyText: {
+  input: {
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 10,
+    fontSize: 16,
+  },
+  multilineInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  addButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  addButtonText: {
     fontSize: 14,
+    fontWeight: 'bold',
+  },
+  emptyTasks: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
     fontStyle: 'italic',
+    textAlign: 'center',
+    marginVertical: 10,
+  },
+  tasksList: {
+    flex: 1,
+  },
+  taskItem: {
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 10,
+  },
+  taskContent: {
+    flex: 1,
+  },
+  taskTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  dayChip: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 4,
+  },
+  dayText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  taskActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  taskActionButton: {
+    padding: 4,
+  },
+  taskActionText: {
+    fontSize: 14,
+  },
+  friendsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  friendChip: {
+    padding: 8,
+    borderRadius: 4,
+    margin: 4,
+  },
+  friendName: {
+    fontSize: 14,
+  },
+  emptyFriends: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  validationMessage: {
+    textAlign: 'center',
+    marginVertical: 10,
+    fontSize: 14,
+  },
+  saveButton: {
+    padding: 12,
+    borderRadius: 4,
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  dayPickerContainer: {
+    width: '80%',
+    maxWidth: 400,
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  dayPickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  selectAllButton: {
+    padding: 10,
+    borderRadius: 4,
+    marginTop: 10,
+  },
+  selectAllText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  doneButton: {
+    padding: 10,
+    borderRadius: 4,
+    marginTop: 10,
+  },
+  doneText: {
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 

@@ -530,15 +530,37 @@ export const habitService = {
   },
 
   subscribeToHabits(userId: string, callback: () => void) {
-    if (!userId) return;
+    if (!userId) return () => {};
 
-    const userRef = doc(db, "users", userId);
+    // Add delay for token propagation
+    const setupTimerId = setTimeout(() => {
+      try {
+        const userRef = doc(db, "users", userId);
 
-    return onSnapshot(userRef, (doc) => {
-      const userData = doc.data() as UserData;
-      if (userData?.habits) {
-        callback();
+        const unsubscribe = onSnapshot(userRef, {
+          next: (doc) => {
+            const userData = doc.data() as UserData;
+            if (userData?.habits) {
+              callback();
+            }
+          },
+          error: (error) => {
+            console.error("Habits listener error:", error);
+            // This is non-critical, so don't attempt to retry
+            // Just log the error
+          },
+        });
+
+        return unsubscribe;
+      } catch (error) {
+        console.error("Error setting up habits listener:", error);
+        return () => {}; // Return empty function if setup fails
       }
-    });
+    }, 2000); // 2 second delay for auth token propagation
+
+    // Return function that cleans up the setup timer
+    return () => {
+      clearTimeout(setupTimerId);
+    };
   },
 };

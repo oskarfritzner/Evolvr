@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
+import { View, Text, StyleSheet, Dimensions, Platform } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { ProgressSnapshot } from '@/backend/types/UserData';
 import { categories } from '@/constants/categories';
 import { Timestamp } from 'firebase/firestore';
+import { LineChart } from 'react-native-chart-kit';
 
 interface TimelineGraphProps {
   snapshots: ProgressSnapshot[];
@@ -132,23 +132,31 @@ export default function TimelineGraph({
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       <Text style={[styles.title, { color: colors.textPrimary }]}>Progress Timeline</Text>
-      <LineChart
-        data={chartData}
-        width={screenWidth - 32}
-        height={220}
-        chartConfig={chartConfig}
-        bezier
-        style={styles.chart}
-        withInnerLines={false}
-        withOuterLines={true}
-        withDots={true}
-        withShadow={false}
-        withVerticalLines={false}
-        withHorizontalLines={true}
-        withVerticalLabels={true}
-        withHorizontalLabels={true}
-        fromZero={true}
-      />
+      {Platform.OS !== 'web' ? (
+        <LineChart
+          data={chartData}
+          width={screenWidth - 32}
+          height={220}
+          chartConfig={chartConfig}
+          bezier
+          style={styles.chart}
+          withInnerLines={false}
+          withOuterLines={true}
+          withDots={true}
+          withShadow={false}
+          withVerticalLines={false}
+          withHorizontalLines={true}
+          withVerticalLabels={true}
+          withHorizontalLabels={true}
+          fromZero={true}
+        />
+      ) : (
+        <View style={[styles.chart, { height: 220, backgroundColor: colors.surface }]}>
+          <Text style={[styles.noDataText, { color: colors.textSecondary }]}>
+            Timeline chart not available on web
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

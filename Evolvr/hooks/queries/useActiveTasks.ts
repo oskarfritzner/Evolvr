@@ -271,6 +271,16 @@ export function useActiveTasks(userId?: string) {
 
       return { previousTasks };
     },
+    onSettled: () => {
+      // Only invalidate the activeTasks query
+      queryClient.invalidateQueries({
+        queryKey: ["activeTasks", userId],
+        exact: true,
+      });
+    },
+    onSuccess: () => {
+      // No need to invalidate here as onSettled will handle it
+    },
     onError: (error, variables, context) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(
@@ -278,21 +288,8 @@ export function useActiveTasks(userId?: string) {
           context.previousTasks
         );
       }
-    },
-    onSettled: () => {
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ["activeTasks", userId] });
-      queryClient.invalidateQueries({ queryKey: ["userData", userId] });
-      queryClient.invalidateQueries({ queryKey: ["routines", userId] });
-      queryClient.invalidateQueries({ queryKey: ["challenges", userId] });
-      queryClient.invalidateQueries({ queryKey: ["challengeTasks", userId] });
-    },
-    onSuccess: () => {
-      // Invalidate relevant queries to force refetch
-      queryClient.invalidateQueries({ queryKey: ["activeTasks", userId] });
-      queryClient.invalidateQueries({ queryKey: ["routines", userId] });
-      queryClient.invalidateQueries({ queryKey: ["challenges", userId] });
-      queryClient.invalidateQueries({ queryKey: ["challengeTasks", userId] });
+      // Log the error for debugging
+      console.error("Error completing task:", error);
     },
   });
 

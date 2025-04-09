@@ -1,271 +1,256 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, Platform } from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
-import { FontAwesome5 } from '@expo/vector-icons';
-import type { Routine } from '@/backend/types/Routine';
-import RoutineCard from './RoutineCard';
-import  CreateRoutine  from '@/components/routines/CreateRoutine';
-import { useRoutines } from '@/hooks/queries/useRoutines';
-import { useAuth } from '@/context/AuthContext';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { useClientLayoutEffect } from '@/hooks/utils/useClientLayoutEffect';
-import ConfirmationDialog from '@/components/common/ConfirmationDialog';
-import Toast from 'react-native-toast-message';
-import { useQueryClient } from '@tanstack/react-query';
-import { routineService } from '@/backend/services/routineServices';
+import React, { useState, useEffect, useRef } from 'react'
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Pressable, TouchableOpacity } from 'react-native'
+import { useNavigation, useRoute } from '@react-navigation/native'
+import { routineService } from '@/backend/services/routineServices'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/context/AuthContext'
+import { useTheme } from '@/context/ThemeContext'
+import RoutineCard from './RoutineCard'
+import CreateRoutine from './CreateRoutine'
+import { useToast } from '@/context/ToastContext'
+import ConfirmationDialog from '@/components/shared/ConfirmationDialog'
+import { Router } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
+import { MotiView } from 'moti'
+import { Routine } from '@/types'
+import RoutineItem from './RoutineItem'
+import { FilterButton } from '../common/FilterButton'
+import NoData from '../common/NoData'
 
-interface Props {
-  compact?: boolean;
-  style?: ViewStyle;
+export interface RoutineGridProps {
+  compact?: boolean
+  onItemPress?: (routine: any) => void
+  sharedWithMe?: boolean
 }
 
-const RoutineGrid: React.FC<Props> = ({ compact, style }) => {
-  const { colors } = useTheme();
-  const { user } = useAuth();
-  const [createModalVisible, setCreateModalVisible] = useState(false);
-  const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
-  const [deleteRoutineId, setDeleteRoutineId] = useState<string | null>(null);
-  
-  const { routines, isLoading } = useRoutines(user?.uid);
-  const queryClient = useQueryClient();
+export default function RoutineGrid({ 
+  compact = false, 
+  onItemPress,
+  sharedWithMe = false,
+}: RoutineGridProps) {
+  const { colors } = useTheme()
+  const { user } = useAuth()
+  const toast = useToast()
+  const queryClient = useQueryClient()
+  const [refreshing, setRefreshing] = useState(false)
+  const [createModalVisible, setCreateModalVisible] = useState(false)
+  const [deleteRoutineId, setDeleteRoutineId] = useState<string | null>(null)
+  const [editRoutine, setEditRoutine] = useState<Routine | null>(null)
+  const [filter, setFilter] = useState<'all' | 'current'>('all')
+  const navigation = useNavigation()
+  const router = useRoute() as Router
 
   useEffect(() => {
-    if (user?.uid) {
-      queryClient.prefetchQuery({
-        queryKey: ['routines', user.uid],
-        staleTime: 5 * 60 * 1000,
-        gcTime: 10 * 60 * 1000
-      });
+    if (router && router.params?.routineId) {
+      const routineId = router.params.routineId as string
+      navigation.navigate('routineDetails', { routineId })
     }
-  }, [user?.uid]);
+  }, [router?.params?.routineId, navigation])
 
-  useClientLayoutEffect(() => {
-    // Handle any grid layout calculations or animations
-  }, [compact, routines?.length]);
+  const { data: routines, isLoading, error, refetch } = useQuery(
+    ['routines', user?.uid],
+    () => routineService.getUserRoutines(user?.uid),
+    {
+      enabled: !!user?.uid,
+      onError: (err) => {
+        toast.show({
+          message: 'Failed to load routines',
+          type: 'error',
+        })
+        console.error('Failed to load routines:', err)
+      },
+    }
+  )
 
-  if (isLoading) {
-    return (
-      <View style={[styles.container, style]}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.secondary }]}>
-            Your Routines
-          </Text>
-          <View style={[styles.addButton, { backgroundColor: colors.secondary }]} />
-        </View>
-        <View style={[styles.content, compact && styles.compactContent]}>
-          <LoadingSpinner />
-        </View>
-      </View>
-    );
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await refetch()
+    setRefreshing(false)
   }
 
-  const handleRoutinePress = (routine: Routine) => {
-    setSelectedRoutine(routine);
-    setCreateModalVisible(true);
-  };
-
-  const handleCreateNew = () => {
-    setSelectedRoutine(null);
-    setCreateModalVisible(true);
-  };
-
-  const activeRoutines = routines?.filter(routine => routine.active) || [];
-
   const handleDelete = async () => {
-    if (!user?.uid || !deleteRoutineId) return;
-    
+    if (!deleteRoutineId) return
+
     try {
-      // Debug log
-      console.log('Delete attempt:', {
-        userId: user.uid,
-        routineId: deleteRoutineId,
-        hasCompletedOnboarding: !!user?.userData,
-        isAuthenticated: !!user
-      });
-      
-      await routineService.deleteRoutine(user.uid, deleteRoutineId);
-      queryClient.invalidateQueries({ queryKey: ['routines', user.uid] });
-      Toast.show({
+      await routineService.deleteRoutine(deleteRoutineId)
+      await queryClient.invalidateQueries(['routines', user?.uid])
+      toast.show({
+        message: 'Routine deleted successfully',
         type: 'success',
-        text1: 'Routine deleted successfully'
-      });
+      })
     } catch (error) {
-      console.error('Delete error details:', {
-        error,
-        userId: user.uid,
-        routineId: deleteRoutineId
-      });
-      Toast.show({
+      toast.show({
+        message: 'Failed to delete routine',
         type: 'error',
-        text1: 'Error',
-        text2: 'Failed to delete routine'
-      });
+      })
+      console.error('Failed to delete routine:', error)
     } finally {
-      setDeleteRoutineId(null);
+      setDeleteRoutineId(null)
     }
-  };
+  }
 
-  return (
-    <View style={[styles.container, style]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.secondary }]}>
-          Your Routines
-        </Text>
-        <TouchableOpacity
-          onPress={handleCreateNew}
-          style={[styles.addButton, { backgroundColor: colors.secondary }]}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <FontAwesome5 name="plus" size={16} color={colors.surface} />
-        </TouchableOpacity>
+  const handleRoutineCreated = () => {
+    setCreateModalVisible(false)
+    queryClient.invalidateQueries(['routines', user?.uid])
+  }
+
+  const activeRoutines = routines?.filter(routine => !routine.archivedAt) || []
+
+  const filteredRoutines = activeRoutines.filter(routine => {
+    if (filter === 'current') {
+      return !routine.archivedAt
+    }
+    return true
+  })
+
+  if (isLoading && !refreshing) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
+    )
+  }
 
-      <View style={[styles.content, compact && styles.compactContent]}>
-        {activeRoutines.length === 0 ? (
-          <TouchableOpacity
-            style={[styles.emptyState, { borderColor: colors.textSecondary }]}
-            onPress={handleCreateNew}
-            accessibilityLabel="Create your first routine"
-            accessibilityRole="button"
-          >
-            <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-              No active routines. Tap to create one!
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={[
-            styles.routinesContainer,
-            compact && styles.compactRoutinesContainer
-          ]}>
-            {activeRoutines.map((routine) => (
-              <View 
-                key={routine.id} 
-                style={[
-                  styles.routineCardWrapper,
-                  Platform.select({
-                    web: { minWidth: 300, maxWidth: 400 }
-                  })
-                ]}
-              >
+  // Main content
+  const content = (
+    <View style={[styles.container, { backgroundColor: colors.background }, compact ? styles.compactContainer : {}]}>
+      <View style={[styles.contentView, compact ? styles.compactContent : {}]}>
+        <Text style={[styles.title, { color: colors.text }]}>My Routines</Text>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.routinesContainer, compact ? styles.compactRoutinesContainer : {}]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} />}
+        >
+          {activeRoutines.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                {sharedWithMe
+                  ? "No routines have been shared with you yet."
+                  : "You haven't created any routines yet."}
+              </Text>
+              {!sharedWithMe && !compact && (
+                <TouchableOpacity
+                  style={[styles.createButton, { backgroundColor: colors.primary }]}
+                  onPress={() => setCreateModalVisible(true)}
+                >
+                  <Text style={[styles.createButtonText, { color: colors.background }]}>
+                    Create Routine
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.routinesGrid}>
+              {activeRoutines.map((routine) => (
                 <RoutineCard
+                  key={routine.id}
                   routine={routine}
-                  onPress={() => handleRoutinePress(routine)}
-                  onDelete={() => setDeleteRoutineId(routine.id)}
+                  sharedWithMe={sharedWithMe}
+                  onPress={() => onItemPress?.(routine)}
+                  onDelete={sharedWithMe ? undefined : () => setDeleteRoutineId(routine.id)}
+                  compact={compact}
                 />
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+
+        {!compact && !sharedWithMe && activeRoutines.length > 0 && (
+          <TouchableOpacity
+            style={[styles.floatingButton, { backgroundColor: colors.primary }]}
+            onPress={() => setCreateModalVisible(true)}
+          >
+            <Ionicons name="add" size={24} color={colors.background} />
+          </TouchableOpacity>
         )}
       </View>
+    </View>
+  )
 
-      {createModalVisible && (
-        <CreateRoutine
-          visible={true}
-          onClose={() => setCreateModalVisible(false)}
-          routine={selectedRoutine}
-        />
-      )}
-
-      {!!deleteRoutineId && (
+  // Render modals separately from the main content to avoid nesting issues
+  return (
+    <>
+      {content}
+      
+      {deleteRoutineId && (
         <ConfirmationDialog
-          visible={true}
+          visible={!!deleteRoutineId}
           title="Delete Routine"
           message="Are you sure you want to delete this routine? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
           onConfirm={handleDelete}
           onCancel={() => setDeleteRoutineId(null)}
         />
       )}
-    </View>
-  );
-};
+      
+      <CreateRoutine
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onRoutineCreated={handleRoutineCreated}
+      />
+    </>
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
     flex: 1,
-    position: 'relative',
+    padding: 16,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Platform.OS === 'ios' ? 16 : 12,
-    paddingHorizontal: 8,
-    zIndex: 1,
+  compactContainer: {
+    padding: 8,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 1.6,
-  },
-  addButton: {
-    padding: Platform.OS === 'ios' ? 10 : 8,
-    borderRadius: 20,
-    width: Platform.OS === 'ios' ? 40 : 36,
-    height: Platform.OS === 'ios' ? 40 : 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  content: {
-    width: '100%',
-    position: 'relative',
-    zIndex: 0,
+  contentView: {
+    flex: 1,
   },
   compactContent: {
+    paddingVertical: 8,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  scrollView: {
     flex: 1,
   },
-  routinesContainer: Platform.select({
-    web: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 16,
-      padding: 16,
-      justifyContent: 'flex-start',
-      alignItems: 'stretch',
-    },
-    default: {
-      flexDirection: 'column',
-      gap: 12,
-      padding: 12,
-    },
-  }),
+  routinesContainer: {
+    paddingBottom: 20,
+  },
   compactRoutinesContainer: {
-    flexDirection: 'column',
-    gap: 12,
+    paddingBottom: 10,
   },
-  routineCardWrapper: Platform.select({
-    web: {
-      flex: 1,
-      maxWidth: '48%', // Just under 50% to account for gap
-      minWidth: 300,
-    },
-    default: {
-      width: '100%',
-    },
-  }),
-  emptyState: {
-    margin: 16,
-    padding: Platform.OS === 'ios' ? 24 : 20,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyStateText: {
-    fontSize: Platform.OS === 'ios' ? 15 : 14,
+  emptyText: {
     textAlign: 'center',
-    lineHeight: Platform.OS === 'ios' ? 22 : 20,
+    marginTop: 20,
+    fontSize: 16,
   },
-});
-
-export default RoutineGrid;
+  createButton: {
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  createButtonText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  routinesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    padding: 16,
+    borderRadius: 50,
+  },
+})

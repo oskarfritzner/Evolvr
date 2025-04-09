@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity } from "react-native"
 import { useTheme } from "@/context/ThemeContext"
 import { useAuth } from "@/context/AuthContext"
@@ -24,32 +24,36 @@ import QuickActionsBtnsBar from '@/components/quickActions/QuickActionsBtnsBar';
 
 export default function Dashboard() {
   const { colors } = useTheme();
-  const { user } = useAuth();
-  console.log('[Dashboard] Auth state:', {
-    hasUser: !!user,
-    userId: user?.uid,
-    timestamp: new Date().toISOString()
-  });
-
-  const { data: userData, isLoading: userLoading, error: userError } = useUserData(user?.uid);
-  console.log('[Dashboard] useUserData result:', {
-    hasUserData: !!userData,
-    userLoading,
-    userError: !!userError,
-    userId: user?.uid,
-    timestamp: new Date().toISOString()
-  });
-
-  const { progress: progressData, isLoading: progressLoading } = useProgressData(user?.uid);
-  const router = useRouter();
+  const { user, isInitialized } = useAuth();
   const queryClient = useQueryClient();
-
-  const loading = userLoading || progressLoading;
+  const router = useRouter();
+  
+  // Define all state hooks first, before any other hooks
   const [journalModalVisible, setJournalModalVisible] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [selectedJournalType, setSelectedJournalType] = useState<JournalType | null>(null);
 
-  // Move static styles here after colors is defined
+  // Only fetch user data when we have a user AND auth is initialized
+  const { data: userData, isLoading: userLoading, error: userError } = useUserData(
+    user && isInitialized ? user.uid : undefined
+  );
+
+  // Only fetch progress data when we have user data
+  const { progress: progressData, isLoading: progressLoading } = useProgressData(
+    userData ? user?.uid : undefined
+  );
+  
+  // Create all callbacks in the same order every time
+  const handleCategoryPress = useCallback((category: string) => {
+    router.push(`/(categoryPages)/${category}` as any);
+  }, [router]);
+
+  const loading = useMemo(() => 
+    userLoading || progressLoading || !isInitialized, 
+    [userLoading, progressLoading, isInitialized]
+  );
+
+  // Static styles
   const staticStyles = StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -60,30 +64,40 @@ export default function Dashboard() {
     },
   });
 
+  // Only run layout effect when categories actually change - properly memoized
+  const categoriesKey = userData?.categories ? Object.keys(userData.categories).join(',') : '';
   useClientLayoutEffect(() => {
-    // Handle any dashboard layout calculations
-    // This is especially important for the CategoryCardSlider
-  }, [user?.userData?.categories]);
+    if (!userData?.categories) return;
+    // Handle layout calculations
+  }, [categoriesKey]);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user?.uid) {
-        queryClient.invalidateQueries({ queryKey: ['categories', user.uid] });
+  // Properly memoize the focus effect callback
+  const handleFocusEffect = useCallback(() => {
+    // Only invalidate categories if they exist and we need fresh data
+    if (user?.uid && userData?.categories) {
+      // Check if the data is stale before invalidating
+      const categoriesQueryData = queryClient.getQueryState(['categories', user.uid]);
+      if (categoriesQueryData && categoriesQueryData.dataUpdatedAt < Date.now() - 1000 * 60 * 5) {
+        queryClient.invalidateQueries({ 
+          queryKey: ['categories', user.uid],
+          exact: true 
+        });
       }
-    }, [user?.uid])
-  );
+    }
+  }, [user?.uid, userData?.categories, queryClient]);
 
-  // Check if it's the user's first visit after onboarding
+  // Only invalidate categories on focus if they exist
+  useFocusEffect(handleFocusEffect);
+
+  // Check welcome modal only when user ID changes
   useEffect(() => {
+    if (!userData?.userId) return;
+    
     const checkWelcomeModal = async () => {
       try {
-        if (!userData?.userId) return;
-        
-        // Check for the should_show_welcome flag
         const shouldShowWelcome = await AsyncStorage.getItem(`should_show_welcome_${userData.userId}`);
         if (shouldShowWelcome === 'true') {
           setShowWelcomeModal(true);
-          // Remove the flag immediately to prevent showing again
           await AsyncStorage.removeItem(`should_show_welcome_${userData.userId}`);
         }
       } catch (error) {
@@ -94,18 +108,23 @@ export default function Dashboard() {
     checkWelcomeModal();
   }, [userData?.userId]);
 
-  const handleWelcomeModalClose = () => {
-    setShowWelcomeModal(false);
-  };
-
-  // Add safety check for user authentication
+  // Redirect if no user and auth is initialized
   useEffect(() => {
-    if (!user) {
-      // If no user, redirect to sign in
+    if (isInitialized && !user) {
       router.replace('/(auth)/sign-in');
-      return;
     }
-  }, [user]);
+  }, [user, isInitialized, router]);
+
+  // Log progress data in a useEffect to ensure consistent log placement
+  useEffect(() => {
+    if (progressData) {
+      logger.dev('Progress data:', {
+        hasData: !!progressData,
+        categories: progressData ? Object.keys(progressData) : [],
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [progressData]);
 
   // Show loading spinner while data is loading
   if (loading) {
@@ -149,14 +168,6 @@ export default function Dashboard() {
     );
   }
 
-  // Replace progress data log with more concise version
-  logger.dev('Progress data:', {
-    hasData: !!progressData,
-    categories: progressData ? Object.keys(progressData) : [],
-    timestamp: new Date().toISOString()
-  });
-
-
   return (
     <SafeAreaView style={[staticStyles.safeArea]} edges={['top']}>
       <ScrollView 
@@ -179,9 +190,7 @@ export default function Dashboard() {
           {/* Category Progress Cards */}
           {userData?.categories && (
             <CategoryCardSlider 
-              onCategoryPress={(category: string) => {
-                router.push(`/(categoryPages)/${category}` as any);
-              }}
+              onCategoryPress={handleCategoryPress}
             />
           )}
           
@@ -216,7 +225,9 @@ export default function Dashboard() {
 
           <WelcomeModal 
             visible={showWelcomeModal} 
-            onClose={handleWelcomeModalClose} 
+            onClose={() => {
+              setShowWelcomeModal(false);
+            }} 
           />
         </View>
       </ScrollView>
