@@ -1,268 +1,309 @@
-import React, { useState, useEffect } from 'react'
-import { TouchableOpacity, Text, StyleSheet, View, Image, Platform, Pressable } from 'react-native'
-import { useTheme } from '@/context/ThemeContext'
-import { FontAwesome5 } from '@expo/vector-icons'
-import { Routine } from '@/backend/types/Routine'
-import { useAuth } from '@/context/AuthContext'
-import { routineService } from '@/backend/services/routineServices'
-import { ParticipantData } from '@/backend/types/Participant'
-import { RoutineStatsModal } from './RoutineStatsModal'
-import { LeaveRoutineModal } from './LeaveRoutineModal'
+import React, { useState } from "react";
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  View,
+  Image,
+  Platform,
+} from "react-native";
+import { useTheme } from "@/context/ThemeContext";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { Routine } from "@/backend/types/Routine";
+import { useAuth } from "@/context/AuthContext";
+import { routineService } from "@/backend/services/routineServices";
+import { ParticipantData } from "@/backend/types/Participant";
+import { RoutineStatsModal } from "./RoutineStatsModal";
+import { LeaveRoutineModal } from "./LeaveRoutineModal";
 
 interface RoutineCardProps {
-  routine: Routine
-  onPress: () => void
-  onDelete: () => void
-  compact?: boolean
+  routine: Routine;
+  onPress: () => void;
+  onDelete: () => void;
+  compact?: boolean;
+  sharedWithMe?: boolean;
 }
 
-export default function RoutineCard({ routine, onPress, onDelete, compact }: RoutineCardProps) {
-  const { colors } = useTheme()
-  const { user } = useAuth()
-  const [participants, setParticipants] = useState<ParticipantData[]>([])
-  const [showStats, setShowStats] = useState(false)
-  const [showLeaveModal, setShowLeaveModal] = useState(false)
+export default function RoutineCard({
+  routine,
+  onPress,
+  onDelete,
+  compact,
+  sharedWithMe,
+}: RoutineCardProps) {
+  const { colors } = useTheme();
+  const { user } = useAuth();
+  const [participants, setParticipants] = useState<ParticipantData[]>([]);
+  const [showStats, setShowStats] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   const canDelete = routine.createdBy === user?.uid;
-  const canLeave = !canDelete && routine.participants.includes(user?.uid || '');
-
-  useEffect(() => {
-    const loadParticipants = async () => {
-      try {
-        const participantData = await routineService.getParticipants(routine.participants);
-        setParticipants(participantData);
-      } catch (error) {
-        console.error('Error loading participants:', error);
-        // Set empty array on error to prevent undefined issues
-        setParticipants([]);
-      }
-    };
-    loadParticipants();
-  }, [routine.participants]);
+  const canLeave = !canDelete && routine.participants.includes(user?.uid || "");
 
   const handleLeave = async (keepPersonal: boolean) => {
     try {
       if (user) {
         await routineService.leaveRoutine(user.uid, routine.id, keepPersonal);
-      } else {
-        console.error('User is not authenticated');
       }
     } catch (error) {
-      console.error('Error leaving routine:', error);
+      console.error("Error leaving routine:", error);
     }
   };
 
   return (
-    <TouchableOpacity 
-      style={[styles.container, { 
-        backgroundColor: colors.surface,
-        borderColor: colors.border,
-        opacity: routine.active ? 1 : 0.6
-      }]}
+    <TouchableOpacity
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          shadowColor: colors.textPrimary,
+          opacity: routine.active ? 1 : 0.6,
+        },
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <View style={styles.mainContent}>
         <View style={styles.leftContent}>
-          <View style={styles.titleContainer}>
-            <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1}>
+          <View style={styles.header}>
+            <Text
+              style={[styles.title, { color: colors.textPrimary }]}
+              numberOfLines={1}
+            >
               {routine.title || "Untitled Routine"}
             </Text>
-          </View>
-          
-          {routine.description ? (
-            <View style={styles.descriptionContainer}>
-              <Text 
-                style={[styles.description, { color: colors.textSecondary }]} 
-                numberOfLines={2}
+            <View style={styles.actions}>
+              <TouchableOpacity
+                onPress={() => setShowStats(true)}
+                style={styles.actionButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                {routine.description.length > 100 
-                  ? routine.description.substring(0, 100) + '...'
-                  : routine.description}
-              </Text>
+                <FontAwesome5
+                  name="chart-bar"
+                  size={14}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {canDelete ? (
+                <TouchableOpacity
+                  onPress={onDelete}
+                  style={styles.actionButton}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <FontAwesome5 name="trash" size={14} color={colors.error} />
+                </TouchableOpacity>
+              ) : (
+                canLeave && (
+                  <TouchableOpacity
+                    onPress={() => setShowLeaveModal(true)}
+                    style={styles.actionButton}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <FontAwesome5
+                      name="sign-out-alt"
+                      size={14}
+                      color={colors.warning}
+                    />
+                  </TouchableOpacity>
+                )
+              )}
             </View>
-          ) : (
-            <View style={styles.descriptionContainer}>
-              <Text style={[styles.description, { color: colors.textSecondary }]}>
-                No description provided
-              </Text>
-            </View>
-          )}
-          
-          <View style={styles.participants}>
-            {participants && participants.length > 0 ? (
-              <>
-                {participants.slice(0, 3).map((participant, index) => (
-                  <Image 
-                    key={`${participant.id || index}-${index}`}
-                    source={{ uri: participant.photoURL || 'https://via.placeholder.com/32' }}
-                    style={[
-                      styles.participantImage, 
-                      { 
-                        marginLeft: index > 0 ? -8 : 0,
-                        borderColor: colors.surface
-                      }
-                    ]}
-                  />
-                ))}
-                {participants.length > 3 && (
-                  <View style={[styles.moreParticipants, { backgroundColor: colors.secondary }]}>
-                    <Text style={[styles.moreParticipantsText, { color: colors.surface }]}>
-                      +{participants.length - 3}
-                    </Text>
-                  </View>
-                )}
-              </>
-            ) : (
-              <Text style={[styles.noParticipants, { color: colors.textSecondary }]}>
-                No participants
-              </Text>
-            )}
           </View>
-        </View>
 
-        <View style={styles.actions}>
-          <TouchableOpacity
-            onPress={() => setShowStats(true)}
-            style={styles.actionButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <FontAwesome5 name="chart-bar" size={14} color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          {canDelete ? (
-            <TouchableOpacity
-              onPress={onDelete}
-              style={styles.actionButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          {routine.description && (
+            <Text
+              style={[styles.description, { color: colors.textSecondary }]}
+              numberOfLines={2}
             >
-              <FontAwesome5 name="trash" size={14} color={colors.error} />
-            </TouchableOpacity>
-          ) : canLeave && (
-            <TouchableOpacity
-              onPress={() => setShowLeaveModal(true)}
-              style={styles.actionButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <FontAwesome5 name="sign-out-alt" size={14} color={colors.warning} />
-            </TouchableOpacity>
+              {routine.description}
+            </Text>
           )}
+
+          <View style={styles.footer}>
+            <View style={styles.participants}>
+              {routine.participants.slice(0, 3).map((participantId, index) => (
+                <View
+                  key={participantId}
+                  style={[
+                    styles.participantAvatar,
+                    {
+                      marginLeft: index > 0 ? -8 : 0,
+                      borderColor: colors.surface,
+                      backgroundColor: colors.surfaceContainerLow,
+                    },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: `https://via.placeholder.com/32` }}
+                    style={styles.participantImage}
+                  />
+                </View>
+              ))}
+              {routine.participants.length > 3 && (
+                <View
+                  style={[
+                    styles.moreParticipants,
+                    {
+                      backgroundColor: colors.secondary,
+                      marginLeft: -8,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.moreParticipantsText,
+                      { color: colors.surface },
+                    ]}
+                  >
+                    +{routine.participants.length - 3}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.stats}>
+              <Text style={[styles.statsText, { color: colors.textSecondary }]}>
+                {routine.tasks.length} tasks
+              </Text>
+              {routine.metadata?.currentStreak ? (
+                <View style={styles.streak}>
+                  <FontAwesome5 name="fire" size={12} color={colors.warning} />
+                  <Text style={[styles.streakText, { color: colors.warning }]}>
+                    {routine.metadata.currentStreak}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
         </View>
       </View>
 
-      {showStats && (
-        <RoutineStatsModal
-          visible={showStats}
-          onClose={() => setShowStats(false)}
-          routine={routine}
-          participants={participants || []}
-        />
-      )}
+      <RoutineStatsModal
+        visible={showStats}
+        onClose={() => setShowStats(false)}
+        routine={routine}
+        participants={participants}
+      />
 
-      {showLeaveModal && (
-        <LeaveRoutineModal
-          visible={showLeaveModal}
-          onClose={() => setShowLeaveModal(false)}
-          onLeave={handleLeave}
-          routineTitle={routine.title || "This routine"}
-        />
-      )}
+      <LeaveRoutineModal
+        visible={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        onLeave={handleLeave}
+        routineTitle={routine.title}
+      />
     </TouchableOpacity>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
-  container: Platform.select({
-    web: {
-      flex: 1,
-      minWidth: 300,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 0,
-      borderWidth: 1,
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 2,
+  container: {
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    height: "100%",
+    ...Platform.select({
+      web: {
+        transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+        cursor: "pointer",
+        ":hover": {
+          transform: "translateY(-2px)",
+          boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+        },
       },
-      shadowOpacity: 0.1,
-      shadowRadius: 3.84,
-    },
-    default: {
-      width: '100%',
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 8,
-      borderWidth: 1,
-    },
-  }),
+    }),
+  },
   mainContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flex: 1,
+    gap: 12,
   },
   leftContent: {
     flex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "600",
+    flex: 1,
     marginRight: 12,
   },
-  titleContainer: {
-    marginBottom: 4,
-  },
-  descriptionContainer: {
-    marginBottom: 8,
-  },
-  participants: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  participantImage: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-  },
-  moreParticipants: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginLeft: -8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moreParticipantsText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  noParticipants: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-  title: Platform.select({
-    web: {
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    default: {
-      fontSize: 15,
-      fontWeight: '600',
-    },
-  }),
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 8,
-  },
-  deleteButton: {
-    padding: 8,
-    alignSelf: 'flex-start',
-  },
   description: {
-    fontSize: Platform.OS === 'ios' ? 13 : 12,
-    lineHeight: Platform.OS === 'ios' ? 18 : 16,
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 16,
     opacity: 0.8,
   },
-}); 
+  footer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+  },
+  participants: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  participantAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    overflow: "hidden",
+    backgroundColor: "#f4f4f5",
+  },
+  participantImage: {
+    width: "100%",
+    height: "100%",
+  },
+  moreParticipants: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: -8,
+  },
+  moreParticipantsText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  stats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  statsText: {
+    fontSize: 14,
+    opacity: 0.8,
+  },
+  streak: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  streakText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  actionButton: {
+    padding: 4,
+  },
+});

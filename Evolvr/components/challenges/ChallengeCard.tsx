@@ -1,11 +1,10 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
-import { Challenge } from '@/backend/types/Challenge';
-import { router } from 'expo-router';
-import { FontAwesome5 } from '@expo/vector-icons';
-import { Platform } from 'react-native';
-import { UserChallenge } from '@/backend/types/Challenge';
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
+import { router } from "expo-router";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { Platform } from "react-native";
+import { UserChallenge } from "@/backend/types/Challenge";
 
 interface Props {
   challenge: UserChallenge;
@@ -18,10 +17,12 @@ export default function ChallengeCard({ challenge, onLeave }: Props) {
   return (
     <TouchableOpacity
       style={[styles.card, { backgroundColor: colors.surface }]}
-      onPress={() => router.push({
-        pathname: "/(modals)/challenge",
-        params: { id: challenge.id }
-      })}
+      onPress={() =>
+        router.push({
+          pathname: "/(modals)/challenge",
+          params: { id: challenge.id },
+        })
+      }
       activeOpacity={0.7}
     >
       <View style={styles.header}>
@@ -29,24 +30,24 @@ export default function ChallengeCard({ challenge, onLeave }: Props) {
           {challenge.title}
         </Text>
         {onLeave && (
-          <TouchableOpacity
-            onPress={onLeave}
-            style={styles.deleteButton}
-          >
+          <TouchableOpacity onPress={onLeave} style={styles.deleteButton}>
             <FontAwesome5 name="sign-out-alt" size={16} color={colors.error} />
           </TouchableOpacity>
         )}
       </View>
 
-      <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
+      <Text
+        style={[styles.description, { color: colors.textSecondary }]}
+        numberOfLines={2}
+      >
         {challenge.description}
       </Text>
 
       <View style={styles.metadata}>
         <View style={styles.metaItem}>
-          <FontAwesome5 
-            name="calendar-day" 
-            size={14} 
+          <FontAwesome5
+            name="calendar-day"
+            size={14}
             color={colors.labelSecondary}
             style={styles.metaIcon}
           />
@@ -56,9 +57,9 @@ export default function ChallengeCard({ challenge, onLeave }: Props) {
         </View>
 
         <View style={styles.metaItem}>
-          <FontAwesome5 
-            name="signal" 
-            size={14} 
+          <FontAwesome5
+            name="signal"
+            size={14}
             color={colors.labelSecondary}
             style={styles.metaIcon}
           />
@@ -70,10 +71,13 @@ export default function ChallengeCard({ challenge, onLeave }: Props) {
 
       {challenge.category && challenge.category.length > 0 && (
         <View style={styles.categories}>
-          {challenge.category.map(cat => (
-            <View 
-              key={cat} 
-              style={[styles.categoryChip, { backgroundColor: colors.secondary + '20' }]}
+          {challenge.category.map((cat) => (
+            <View
+              key={cat}
+              style={[
+                styles.categoryChip,
+                { backgroundColor: colors.secondary + "20" },
+              ]}
             >
               <Text style={[styles.categoryText, { color: colors.secondary }]}>
                 {cat}
@@ -91,7 +95,7 @@ const styles = StyleSheet.create({
     web: {
       flex: 1,
       minWidth: 300,
-      maxWidth: '100%',
+      maxWidth: "100%",
       padding: 16,
       borderRadius: 12,
       marginBottom: 12,
@@ -102,7 +106,7 @@ const styles = StyleSheet.create({
       shadowRadius: 4,
     },
     default: {
-      width: '100%',
+      width: "100%",
       padding: 16,
       borderRadius: 12,
       marginBottom: 12,
@@ -114,14 +118,14 @@ const styles = StyleSheet.create({
     },
   }),
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     flex: 1,
     marginRight: 12,
   },
@@ -130,13 +134,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   metadata: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 12,
     gap: 16,
   },
   metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   metaIcon: {
     marginRight: 6,
@@ -145,8 +149,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   categories: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   categoryChip: {
@@ -156,7 +160,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   deleteButton: {
     padding: 8,

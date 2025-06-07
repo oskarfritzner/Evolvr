@@ -26,6 +26,7 @@ module.exports = async function (env, argv) {
   config.resolve.alias = {
     ...config.resolve.alias,
     "react-native$": "react-native-web",
+    tslib: path.resolve(__dirname, "node_modules/tslib/tslib.es6.js"),
   };
 
   // Add fallbacks for node modules

@@ -1,32 +1,43 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
-import HabitItem from './HabitItem';
-import MissedHabitsAlert from './MissedHabitsAlert';
-import { MotiView } from 'moti';
-import { useAuth } from '@/context/AuthContext';
-import { useQueryClient } from '@tanstack/react-query';
-import { habitService } from '@/backend/services/habitService';
-import Toast from 'react-native-toast-message';
-import { Habit } from '@/backend/types/Habit';
-import { UserData } from '@/backend/types/UserData';
+import React, { useState, useCallback, useEffect } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+} from "react-native";
+import HabitItem from "./HabitItem";
+import MissedHabitsAlert from "./MissedHabitsAlert";
+import { MotiView } from "moti";
+import { useAuth } from "@/context/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { habitService } from "@/backend/services/habitService";
+import Toast from "react-native-toast-message";
+import { Habit } from "@/backend/types/Habit";
+import { UserData } from "@/backend/types/UserData";
+import { Easing } from "react-native-reanimated";
 
 interface HabitGridProps {
   habits: Habit[];
   onRefresh?: () => void;
-  missedHabits?: UserData['missedHabits'];
+  missedHabits?: UserData["missedHabits"];
 }
 
-export default function HabitGrid({ habits, onRefresh, missedHabits = [] }: HabitGridProps) {
+export default function HabitGrid({
+  habits,
+  onRefresh,
+  missedHabits = [],
+}: HabitGridProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [showMissedAlert, setShowMissedAlert] = useState(true);
   const [lastCheckTimestamp, setLastCheckTimestamp] = useState<number>(0);
-  
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ['habits', user?.uid] });
-    await queryClient.invalidateQueries({ queryKey: ['userData', user?.uid] });
+    await queryClient.invalidateQueries({ queryKey: ["habits", user?.uid] });
+    await queryClient.invalidateQueries({ queryKey: ["userData", user?.uid] });
     if (onRefresh) onRefresh();
     setRefreshing(false);
   }, [queryClient, user?.uid, onRefresh]);
@@ -36,9 +47,9 @@ export default function HabitGrid({ habits, onRefresh, missedHabits = [] }: Habi
 
     // Invalidate relevant queries
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['habits', user?.uid] }),
-      queryClient.invalidateQueries({ queryKey: ['userData', user?.uid] }),
-      queryClient.invalidateQueries({ queryKey: ['activeTasks', user?.uid] })
+      queryClient.invalidateQueries({ queryKey: ["habits", user?.uid] }),
+      queryClient.invalidateQueries({ queryKey: ["userData", user?.uid] }),
+      queryClient.invalidateQueries({ queryKey: ["activeTasks", user?.uid] }),
     ]);
 
     // Trigger a refresh after a short delay to ensure UI updates
@@ -47,39 +58,45 @@ export default function HabitGrid({ habits, onRefresh, missedHabits = [] }: Habi
     }, 100);
   }, [queryClient, user?.uid, handleRefresh]);
 
-  const handleDelete = useCallback(async (habitId: string) => {
-    if (!user?.uid) return;
-    
-    try {
-      await habitService.deleteHabit(user.uid, habitId);
-      await queryClient.invalidateQueries({ queryKey: ['habits', user?.uid] });
-      Toast.show({
-        type: 'success',
-        text1: 'Habit deleted',
-        position: 'bottom'
-      });
-    } catch (error) {
-      console.error('Error deleting habit:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error instanceof Error ? error.message : 'Failed to delete habit',
-        position: 'bottom'
-      });
-    }
-  }, [queryClient, user?.uid]);
+  const handleDelete = useCallback(
+    async (habitId: string) => {
+      if (!user?.uid) return;
+
+      try {
+        await habitService.deleteHabit(user.uid, habitId);
+        await queryClient.invalidateQueries({
+          queryKey: ["habits", user?.uid],
+        });
+        Toast.show({
+          type: "success",
+          text1: "Habit deleted",
+          position: "bottom",
+        });
+      } catch (error) {
+        console.error("Error deleting habit:", error);
+        Toast.show({
+          type: "error",
+          text1: "Error",
+          text2:
+            error instanceof Error ? error.message : "Failed to delete habit",
+          position: "bottom",
+        });
+      }
+    },
+    [queryClient, user?.uid]
+  );
 
   // Check for missed habits only on mount and after long intervals
   useEffect(() => {
     const now = Date.now();
     // Only check if it's been more than 1 hour since last check
-    if (user?.uid && (now - lastCheckTimestamp > 3600000)) {
+    if (user?.uid && now - lastCheckTimestamp > 3600000) {
       const checkMissedHabits = async () => {
         try {
           await habitService.checkAndHandleMissedDays(user.uid);
           setLastCheckTimestamp(now);
         } catch (error) {
-          console.error('Error checking missed habits:', error);
+          console.error("Error checking missed habits:", error);
         }
       };
       checkMissedHabits();
@@ -111,7 +128,18 @@ export default function HabitGrid({ habits, onRefresh, missedHabits = [] }: Habi
             key={habit.id}
             from={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'timing', duration: 300 }}
+            transition={{
+              opacity: {
+                type: "timing",
+                duration: 300,
+                easing: Easing.bezier(0.2, 0.65, 0.5, 0.9),
+              },
+              scale: {
+                type: "timing",
+                duration: 300,
+                easing: Easing.bezier(0.2, 0.65, 0.5, 0.9),
+              },
+            }}
           >
             <HabitItem
               habit={habit}

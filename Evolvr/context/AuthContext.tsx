@@ -1,18 +1,30 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { ActivityIndicator, View, Platform } from "react-native";
-import { onAuthStateChanged, User as FirebaseUser, signOut as firebaseSignOut, signInWithEmailAndPassword } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  User as FirebaseUser,
+  signOut as firebaseSignOut,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 import { doc, onSnapshot, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/backend/config/firebase";
 import { userService } from "@/backend/services/userService";
 import { UserData, UserType } from "@/backend/types/UserData";
 import { router } from "expo-router";
 import { routineService } from "@/backend/services/routineServices";
-import logger from '@/utils/logger';
+import logger from "@/utils/logger";
 import { registrationService } from "@/backend/services/registrationService";
 import { notificationService } from "@/backend/services/notificationService";
 import { useQueryClient } from "@tanstack/react-query";
 import { incompleteUser } from "@/backend/types/User";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { authValidation } from "@/utils/authValidation";
 import { useRegistration } from "@/hooks/auth/useRegistration";
 
@@ -46,69 +58,87 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-const AUTH_KEY = 'auth_user_data';
+const AUTH_KEY = "auth_user_data";
 
 // Add type for navigation paths
-type NavigationPath = "/onboarding" | "/(tabs)/dashboard" | "/sign-in" | "/register" | null;
+type NavigationPath =
+  | "/onboarding"
+  | "/(tabs)/dashboard"
+  | "/sign-in"
+  | "/register"
+  | null;
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [pendingNavigation, setPendingNavigation] = useState<NavigationPath>(null);
-  const [unsubscribeUserData, setUnsubscribeUserData] = useState<(() => void) | null>(null);
-  const [unsubscribeNotifications, setUnsubscribeNotifications] = useState<(() => void) | null>(null);
+  const [pendingNavigation, setPendingNavigation] =
+    useState<NavigationPath>(null);
+  const [unsubscribeUserData, setUnsubscribeUserData] = useState<
+    (() => void) | null
+  >(null);
+  const [unsubscribeNotifications, setUnsubscribeNotifications] = useState<
+    (() => void) | null
+  >(null);
   const queryClient = useQueryClient();
 
   // Get registration methods
-  const setRegistrationData = useRegistration((state) => state.setRegistrationData);
+  const setRegistrationData = useRegistration(
+    (state) => state.setRegistrationData
+  );
 
   // Memoize the function to update user data in both context and React Query
-  const updateUserDataState = useCallback((newUserData: UserData, userId: string) => {
-    setUserData(newUserData);
-    setUser(prev => prev ? {
-      ...prev,
-      userData: newUserData
-    } : {
-      uid: userId,
-      userData: newUserData
-    });
-    
-    // Update React Query cache
-    queryClient.setQueryData(["userData", userId], newUserData);
-  }, [queryClient]);
+  const updateUserDataState = useCallback(
+    (newUserData: UserData, userId: string) => {
+      setUserData(newUserData);
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              userData: newUserData,
+            }
+          : {
+              uid: userId,
+              userData: newUserData,
+            }
+      );
+
+      // Update React Query cache
+      queryClient.setQueryData(["userData", userId], newUserData);
+    },
+    [queryClient]
+  );
 
   // Setup Firestore listener with retry mechanism and delay
-  const setupUserDataListener = useCallback(async (userId: string, retries = 3, delay = 1000) => {
-    try {
-      // Check if we have a valid auth state
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        logger.warn('Attempting to setup listener without auth');
-        return;
-      }
+  const setupUserDataListener = useCallback(
+    async (userId: string, retries = 3, delay = 1000) => {
+      try {
+        // Check if we have a valid auth state
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          logger.warn("Attempting to setup listener without auth");
+          return;
+        }
 
-      // Add initial delay to ensure token propagation
-      await new Promise(resolve => setTimeout(resolve, delay));
+        // Add initial delay to ensure token propagation
+        await new Promise((resolve) => setTimeout(resolve, delay));
 
-      if (unsubscribeUserData) {
-        unsubscribeUserData();
-      }
+        if (unsubscribeUserData) {
+          unsubscribeUserData();
+        }
 
-      const userRef = doc(db, "users", userId);
-      
-      // First get the initial data
-      const initialDoc = await getDoc(userRef);
-      if (initialDoc.exists()) {
-        const initialData = initialDoc.data() as UserData;
-        updateUserDataState(initialData, userId);
-      }
+        const userRef = doc(db, "users", userId);
 
-      // Then set up the real-time listener with exponential backoff on error
-      const unsubUserData = onSnapshot(
-        userRef,
-        {
+        // First get the initial data
+        const initialDoc = await getDoc(userRef);
+        if (initialDoc.exists()) {
+          const initialData = initialDoc.data() as UserData;
+          updateUserDataState(initialData, userId);
+        }
+
+        // Then set up the real-time listener with exponential backoff on error
+        const unsubUserData = onSnapshot(userRef, {
           next: (doc) => {
             if (doc.exists()) {
               const newUserData = doc.data() as UserData;
@@ -116,35 +146,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
           },
           error: async (error) => {
-            logger.error('User data listener error:', error);
-            if (error.code === 'permission-denied' && retries > 0) {
+            logger.error("User data listener error:", error);
+            if (error.code === "permission-denied" && retries > 0) {
               // Wait with exponential backoff and retry
               const backoffDelay = Math.min(delay * 2, 10000); // Max 10 seconds
-              await new Promise(resolve => setTimeout(resolve, backoffDelay));
+              await new Promise((resolve) => setTimeout(resolve, backoffDelay));
               setupUserDataListener(userId, retries - 1, backoffDelay);
             } else if (retries <= 0) {
-              logger.warn('Maximum retry attempts reached for user data listener');
+              logger.warn(
+                "Maximum retry attempts reached for user data listener"
+              );
               // Consider notifying the user or implementing fallback behavior
             } else {
               logger.error(`Unhandled listener error: ${error.code}`);
             }
-          }
+          },
+        });
+
+        setUnsubscribeUserData(() => unsubUserData);
+      } catch (error) {
+        logger.error("Error setting up user data listener:", error);
+        if (retries > 0) {
+          const backoffDelay = Math.min(delay * 2, 10000); // Max 10 seconds
+          await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+          setupUserDataListener(userId, retries - 1, backoffDelay);
+        } else {
+          logger.warn(
+            "Maximum retry attempts reached while setting up listener"
+          );
+          // Consider implementing fallback behavior here
         }
-      );
-      
-      setUnsubscribeUserData(() => unsubUserData);
-    } catch (error) {
-      logger.error('Error setting up user data listener:', error);
-      if (retries > 0) {
-        const backoffDelay = Math.min(delay * 2, 10000); // Max 10 seconds
-        await new Promise(resolve => setTimeout(resolve, backoffDelay));
-        setupUserDataListener(userId, retries - 1, backoffDelay);
-      } else {
-        logger.warn('Maximum retry attempts reached while setting up listener');
-        // Consider implementing fallback behavior here
       }
-    }
-  }, [unsubscribeUserData, updateUserDataState]);
+    },
+    [unsubscribeUserData, updateUserDataState]
+  );
 
   // Handle auth state changes
   useEffect(() => {
@@ -157,36 +192,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
             // Immediately set basic user state
             setUser({
               uid: firebaseUser.uid,
-              userData: null
+              userData: null,
             });
 
             // Get initial user data
             const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-            
+
             if (userDoc.exists()) {
               const userData = userDoc.data() as UserData;
-              
+
               // Update both context and React Query cache
               updateUserDataState(userData, firebaseUser.uid);
-              
+
               // Set up real-time listener only after we have initial data
               await setupUserDataListener(firebaseUser.uid);
-              
+
               // Add debouncing for notification updates
               if (unsubscribeNotifications) {
                 unsubscribeNotifications();
               }
-              const unsubNotifications = notificationService.subscribeToUnreadCount(
-                firebaseUser.uid,
-                // Add debounce time to prevent rapid updates
-                { debounceTime: 1000 }
-              );
+              const unsubNotifications =
+                notificationService.subscribeToUnreadCount(
+                  firebaseUser.uid,
+                  // Add debounce time to prevent rapid updates
+                  { debounceTime: 1000 }
+                );
               setUnsubscribeNotifications(() => unsubNotifications);
 
               // Only redirect to dashboard on initial auth or when coming from auth screens
               // This prevents the constant redirects during normal navigation
-              const isFromAuthOrInitial = !router.canGoBack() || pendingNavigation === "/(tabs)/dashboard";
-              
+              const isFromAuthOrInitial =
+                !router.canGoBack() ||
+                pendingNavigation === "/(tabs)/dashboard";
+
               if (isFromAuthOrInitial) {
                 // Wrap navigation in a microtask to ensure root layout is mounted
                 setTimeout(() => {
@@ -199,16 +237,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
               }
             } else {
               // Handle incomplete user registration
-              const incompleteUser = await registrationService.get(firebaseUser.uid);
+              const incompleteUser = await registrationService.get(
+                firebaseUser.uid
+              );
               if (incompleteUser?.onboardingComplete === false) {
                 const registrationData = {
                   email: incompleteUser.email,
                   userId: firebaseUser.uid,
                   onboardingStarted: true,
-                  onboardingStep: incompleteUser.onboardingStep || 1
+                  onboardingStep: incompleteUser.onboardingStep || 1,
                 };
                 setRegistrationData(registrationData);
-                queryClient.setQueryData(['registrationData'], registrationData);
+                queryClient.setQueryData(
+                  ["registrationData"],
+                  registrationData
+                );
                 setTimeout(() => {
                   router.replace("/onboarding");
                 }, 0);
@@ -226,11 +269,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
               router.replace("/sign-in");
             }, 0);
           }
-          
+
           setIsInitialized(true);
           setIsLoading(false);
         } catch (error) {
-          logger.error('Error in auth state change:', error);
+          logger.error("Error in auth state change:", error);
           setIsInitialized(true);
           setIsLoading(false);
           // On error, clear state and redirect to sign in
@@ -255,7 +298,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = async () => {
     try {
       setIsLoading(true);
-      
+
       // Clear all listeners first
       if (unsubscribeUserData) {
         unsubscribeUserData();
@@ -270,16 +313,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null);
       setUserData(null);
       queryClient.clear();
-      
+
       // Clear storage
       await Promise.all([
         AsyncStorage.removeItem(AUTH_KEY),
-        authValidation.resetSignInAttempts()
+        authValidation.resetSignInAttempts(),
       ]);
 
       // Finally, sign out from Firebase
       await firebaseSignOut(auth);
-      
+
       // Use a more reliable navigation approach
       if (router.canGoBack()) {
         router.replace("/sign-in");
@@ -291,7 +334,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
       }
     } catch (error) {
-      logger.error('Error signing out:', error);
+      logger.error("Error signing out:", error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -301,36 +344,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
       // Add a delay before setting up listeners to ensure token propagation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Get user data
       const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data() as UserData;
         updateUserDataState(userData, userCredential.user.uid);
-        
+
         // Set up listeners after delay
         await setupUserDataListener(userCredential.user.uid);
-        
+
         // Navigate to dashboard on successful sign in - use setTimeout to prevent timing issues
         setTimeout(() => {
           router.replace("/(tabs)/dashboard");
         }, 0);
       } else {
         // Check if user is in incomplete registration
-        const incompleteUser = await registrationService.get(userCredential.user.uid);
+        const incompleteUser = await registrationService.get(
+          userCredential.user.uid
+        );
         if (incompleteUser?.onboardingComplete === false) {
           const registrationData = {
             email: incompleteUser.email,
             userId: userCredential.user.uid,
             onboardingStarted: true,
-            onboardingStep: incompleteUser.onboardingStep || 1
+            onboardingStep: incompleteUser.onboardingStep || 1,
           };
           setRegistrationData(registrationData);
-          queryClient.setQueryData(['registrationData'], registrationData);
+          queryClient.setQueryData(["registrationData"], registrationData);
           setTimeout(() => {
             router.replace("/onboarding");
           }, 0);
@@ -339,7 +388,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       return userCredential.user;
     } catch (error) {
-      logger.error('Sign in error:', error);
+      logger.error("Sign in error:", error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -351,17 +400,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userDoc = await getDoc(doc(db, "users", userId));
       if (userDoc.exists()) {
         const newUserData = userDoc.data() as UserData;
-        
+
         // Update React Query cache
         queryClient.setQueryData(["userData", userId], newUserData);
-        
+
         // Update auth context state
         setUserData(newUserData);
-        setUser(prev => {
+        setUser((prev) => {
           if (!prev) return null;
           return {
             ...prev,
-            userData: newUserData
+            userData: newUserData,
           };
         });
 
@@ -369,7 +418,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       return null;
     } catch (error) {
-      console.error('Error refreshing user data:', error);
+      console.error("Error refreshing user data:", error);
       throw error;
     }
   };
@@ -390,7 +439,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return <LoadingSpinner />;
   }
 
-  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  );
 }
 
 export const useAuth = () => {
@@ -402,11 +453,13 @@ export const useAuth = () => {
 };
 
 // After successful login/initialization
-const initializeUserData = async (user: FirebaseUser & { userData?: UserData | null }) => {
+const initializeUserData = async (
+  user: FirebaseUser & { userData?: UserData | null }
+) => {
   try {
     // ... other initialization
     await routineService.getUserRoutines(user.uid); // This will refresh cache
   } catch (error) {
-    logger.error('Error initializing user data:', error);
+    logger.error("Error initializing user data:", error);
   }
 };

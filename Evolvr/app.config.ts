@@ -1,4 +1,4 @@
-import { ExpoConfig, ConfigContext } from "expo/config";
+import { ExpoConfig, ConfigContext } from "@expo/config";
 
 // Helper to get environment variables with fallbacks
 const getEnvVar = (key: string, fallback: string = ""): string => {

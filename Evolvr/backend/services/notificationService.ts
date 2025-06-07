@@ -182,7 +182,7 @@ export const notificationService = {
     userId: string,
     options = { debounceTime: 1000 }
   ) => {
-    let timeout: NodeJS.Timeout;
+    let timeout: ReturnType<typeof setTimeout>;
 
     // Add initial delay for auth token propagation
     const setupTimerId = setTimeout(() => {

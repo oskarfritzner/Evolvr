@@ -1,24 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, SafeAreaView, Animated, ScrollView, Modal, Dimensions, PanResponder } from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
-import Task from '@/backend/types/Task';
-import { taskService } from '@/backend/services/taskService';
-import { FontAwesome5 } from '@expo/vector-icons';
-import LittleTask from '@/components/tasks/littleTask';
-import { useAuth } from '@/context/AuthContext';
-import ErrorMessage from '@/components/errorHandlingMessages/errorMessage';
-import { useRoutine } from '@/context/RoutineContext';
-import { TextInput } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons';
-import { useQueryClient } from '@tanstack/react-query';
-import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
-import { ChatModal } from '@/components/chat';
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  SafeAreaView,
+  Animated,
+  ScrollView,
+  Modal,
+  Dimensions,
+  PanResponder,
+} from "react-native";
+import { useTheme } from "@/context/ThemeContext";
+import Task from "@/backend/types/Task";
+import { taskService } from "@/backend/services/taskService";
+import { FontAwesome5 } from "@expo/vector-icons";
+import LittleTask from "@/components/tasks/littleTask";
+import { useAuth } from "@/context/AuthContext";
+import ErrorMessage from "@/components/errorHandlingMessages/errorMessage";
+import { useRoutine } from "@/context/RoutineContext";
+import { TextInput } from "react-native-paper";
+import { Ionicons } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
+import { SafeAreaView as SafeAreaViewRN } from "react-native-safe-area-context";
+import { ChatModal } from "@/components/chat";
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  type: 'active' | 'routine' | 'habit';
-  mode?: 'create' | 'edit';
+  type: "active" | "routine" | "habit";
+  mode?: "create" | "edit";
   onTaskAdded?: (task?: Task) => void;
   selectedTaskId?: string;
   title?: string;
@@ -32,17 +45,17 @@ const COMMON_HABIT_TITLES = ["Quit Addiction", "Meditate", "Journal entry"];
 const staticStyles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalContainer: {
-    width: '100%',
-    height: '85%',
-    maxHeight: '95%',
+    width: "100%",
+    height: "85%",
+    maxHeight: "95%",
     minHeight: 300,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    overflow: 'hidden',
+    overflow: "hidden",
     elevation: 5,
   },
   closeButton: {
@@ -62,7 +75,7 @@ const staticStyles = StyleSheet.create({
   categoryFilters: {
     paddingHorizontal: 16,
     paddingBottom: 8,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   categoryChip: {
@@ -70,11 +83,11 @@ const staticStyles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     minWidth: 80,
-    alignItems: 'center',
+    alignItems: "center",
   },
   categoryChipText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   listContainer: {
     padding: 16,
@@ -82,19 +95,19 @@ const staticStyles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   emptyText: {
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   headerContainer: {
     paddingHorizontal: 16,
@@ -102,44 +115,44 @@ const staticStyles = StyleSheet.create({
     paddingBottom: 12,
   },
   headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   headerBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   createTaskButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
     gap: 6,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   createTaskButtonText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   buttonIcon: {
     marginRight: 2,
   },
   myTasksChip: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     minWidth: 80,
-    alignItems: 'center',
+    alignItems: "center",
   },
   description: {
     fontSize: 14,
@@ -149,53 +162,65 @@ const staticStyles = StyleSheet.create({
   },
   dragIndicatorContainer: {
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   dragIndicator: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#ccc',
+    backgroundColor: "#ccc",
   },
 });
 
-const getContextSpecificTitle = (type: 'active' | 'routine' | 'habit') => {
+const getContextSpecificTitle = (type: "active" | "routine" | "habit") => {
   switch (type) {
-    case 'habit':
-      return 'Select Habit Task';
-    case 'routine':
-      return 'Add Task to Routine';
+    case "habit":
+      return "Select Habit Task";
+    case "routine":
+      return "Add Task to Routine";
     default:
-      return 'Add Task';
+      return "Add Task";
   }
 };
 
-const getContextSpecificDescription = (type: 'active' | 'routine' | 'habit') => {
+const getContextSpecificDescription = (
+  type: "active" | "routine" | "habit"
+) => {
   switch (type) {
-    case 'habit':
-      return 'Choose a task to turn into a habit. This will be your daily goal for the next 66 days.';
-    case 'routine':
-      return 'Add tasks to your routine. You can set specific days for each task later.';
+    case "habit":
+      return "Choose a task to turn into a habit. This will be your daily goal for the next 66 days.";
+    case "routine":
+      return "Add tasks to your routine. You can set specific days for each task later.";
     default:
-      return 'Add a task to your active tasks list.';
+      return "Add a task to your active tasks list.";
   }
 };
 
-const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, selectedTaskId, title, description, filterPredicate }) => {
+const AddTask: React.FC<Props> = ({
+  visible,
+  onClose,
+  type,
+  mode,
+  onTaskAdded,
+  selectedTaskId,
+  title,
+  description,
+  filterPredicate,
+}) => {
   const { colors } = useTheme();
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
   const fadeAnim = useState(new Animated.Value(0))[0];
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
   const errorAnim = useState(new Animated.Value(0))[0];
   const { addTaskToRoutine } = useRoutine();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const translateY = useRef(new Animated.Value(0)).current;
-  const screenHeight = Dimensions.get('screen').height;
+  const screenHeight = Dimensions.get("screen").height;
   const queryClient = useQueryClient();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showUserTasks, setShowUserTasks] = useState(false);
@@ -210,7 +235,8 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
         translateY.setValue(0);
       },
       onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) { // Only allow downward drag
+        if (gestureState.dy > 0) {
+          // Only allow downward drag
           translateY.setValue(gestureState.dy);
         }
       },
@@ -255,7 +281,7 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
     setLoading(true);
     try {
       let fetchedTasks: Task[] = [];
-      
+
       if (selectedCategory) {
         fetchedTasks = await taskService.getTasksByCategory(selectedCategory);
       } else {
@@ -264,20 +290,21 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
       }
 
       // For habits, ensure we include both habit-specific tasks and regular tasks
-      if (type === 'habit') {
-        fetchedTasks = fetchedTasks.filter(task => 
-          task.type === 'habit' || 
-          COMMON_HABIT_TITLES.includes(task.title) ||
-          // Include regular tasks and user-generated tasks that can be turned into habits
-          task.type === 'user-generated' ||
-          !task.type || 
-          task.type === 'normal'
+      if (type === "habit") {
+        fetchedTasks = fetchedTasks.filter(
+          (task) =>
+            task.type === "habit" ||
+            COMMON_HABIT_TITLES.includes(task.title) ||
+            // Include regular tasks and user-generated tasks that can be turned into habits
+            task.type === "user-generated" ||
+            !task.type ||
+            task.type === "normal"
         );
       }
 
       setTasks(fetchedTasks);
     } catch (error) {
-      console.error('Error loading tasks:', error);
+      console.error("Error loading tasks:", error);
     } finally {
       setLoading(false);
     }
@@ -286,7 +313,7 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
   const showSuccessMessage = (message: string) => {
     setSuccessMessage(message);
     fadeAnim.setValue(0);
-    
+
     // Slide down
     Animated.spring(fadeAnim, {
       toValue: 1,
@@ -300,7 +327,7 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
           toValue: 0,
           duration: 200,
           useNativeDriver: true,
-        }).start(() => setSuccessMessage(''));
+        }).start(() => setSuccessMessage(""));
       }, 1500);
     });
   };
@@ -318,41 +345,43 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
           toValue: 0,
           duration: 300,
           useNativeDriver: true,
-        }).start(() => setErrorMessage(''));
+        }).start(() => setErrorMessage(""));
       }, 2000);
     });
   };
 
   const handleAddTask = async (taskId: string) => {
     if (!user?.uid) return;
-    
+
     try {
       // Find the task in our filtered list
-      const task = tasks.find(t => t.id === taskId);
+      const task = tasks.find((t) => t.id === taskId);
       if (!task) return;
 
-      if (type === 'habit') {
+      if (type === "habit") {
         // For habits, just pass the task back to the parent
         if (onTaskAdded) {
           onTaskAdded(task);
         }
-        showSuccessMessage('Task selected for habit');
+        showSuccessMessage("Task selected for habit");
       } else {
         // For active tasks, add to active tasks list
         await taskService.addTaskToActive(user.uid, taskId);
         queryClient.invalidateQueries({ queryKey: ["activeTasks", user.uid] });
-        showSuccessMessage('Task added to your active tasks!');
+        showSuccessMessage("Task added to your active tasks!");
       }
-      
+
       setTimeout(() => {
         onClose();
-        if (onTaskAdded && type !== 'habit') {
+        if (onTaskAdded && type !== "habit") {
           onTaskAdded();
         }
       }, 1000);
     } catch (error) {
-      console.error('Error adding task:', error);
-      showErrorMessage(error instanceof Error ? error.message : 'Failed to add task');
+      console.error("Error adding task:", error);
+      showErrorMessage(
+        error instanceof Error ? error.message : "Failed to add task"
+      );
     }
   };
 
@@ -361,8 +390,8 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
       if (onTaskAdded) {
         onTaskAdded(task);
       }
-      showSuccessMessage('Task added to routine!');
-      if (mode === 'edit') {
+      showSuccessMessage("Task added to routine!");
+      if (mode === "edit") {
         setTimeout(() => {
           onClose();
         }, 300);
@@ -371,42 +400,58 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
       if (error instanceof Error) {
         showErrorMessage(error.message);
       } else {
-        showErrorMessage('Failed to add task to routine');
+        showErrorMessage("Failed to add task to routine");
       }
     }
   };
 
-  const filteredTasks = tasks.filter(task => {
-    const matchesSearch = 
+  const filteredTasks = tasks.filter((task) => {
+    const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    const matchesCategory = !categoryFilter || 
-      Object.entries(task.categoryXp)
-        .some(([category, xp]) => category === categoryFilter && xp > 0);
+      task.tags?.some((tag) =>
+        tag.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+    const matchesCategory =
+      !categoryFilter ||
+      Object.entries(task.categoryXp).some(
+        ([category, xp]) => category === categoryFilter && xp > 0
+      );
 
     // Show all tasks when showUserTasks is false, only show user-generated when true
-    const matchesUserFilter = showUserTasks ? task.type === 'user-generated' : true;
-    
+    const matchesUserFilter = showUserTasks
+      ? task.type === "user-generated"
+      : true;
+
     // For habits, we've already filtered in loadTasks
-    const matchesType = type === 'habit' ? true : true;
+    const matchesType = type === "habit" ? true : true;
 
     const matchesPredicate = filterPredicate ? filterPredicate(task) : true;
-    
-    return matchesSearch && matchesCategory && matchesUserFilter && matchesType && matchesPredicate;
+
+    return (
+      matchesSearch &&
+      matchesCategory &&
+      matchesUserFilter &&
+      matchesType &&
+      matchesPredicate
+    );
   });
 
   const renderTaskItem = ({ item }: { item: Task }) => (
-    <LittleTask 
+    <LittleTask
       task={item}
-      type={type === 'habit' ? 'active' : type}
-      selectedDays={type === 'routine' ? [0,1,2,3,4,5,6] : undefined}
+      type={type === "habit" ? "active" : type}
+      selectedDays={type === "routine" ? [0, 1, 2, 3, 4, 5, 6] : undefined}
       onAddPress={async (taskId) => {
-        if (type === 'routine') {
-          handleAddToRoutine(item);
+        if (type === "routine") {
+          if (onTaskAdded) {
+            onTaskAdded(item);
+            showSuccessMessage("Task added to routine!");
+            setTimeout(() => onClose(), 1000);
+          }
         } else {
-          handleAddTask(taskId);
+          await handleAddTask(taskId);
         }
       }}
     />
@@ -415,21 +460,21 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
   // Dynamic styles that depend on colors
   const dynamicStyles = StyleSheet.create({
     successContainer: {
-      position: 'absolute',
+      position: "absolute",
       top: 0,
       left: 0,
       right: 0,
-      alignItems: 'center',
+      alignItems: "center",
       paddingTop: 16,
       zIndex: 1000,
     },
     successMessage: {
-      backgroundColor: colors.success || '#4CAF50',
+      backgroundColor: colors.success || "#4CAF50",
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 8,
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       gap: 8,
       shadowColor: "#000",
       shadowOffset: {
@@ -441,9 +486,9 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
       elevation: 4,
     },
     successText: {
-      color: '#fff',
+      color: "#fff",
       fontSize: 14,
-      fontWeight: '500',
+      fontWeight: "500",
     },
   });
 
@@ -457,17 +502,25 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
       presentationStyle="overFullScreen"
     >
       <SafeAreaViewRN style={staticStyles.overlay}>
-        <Animated.View 
+        <Animated.View
           style={[
-            staticStyles.modalContainer, 
-            { 
+            staticStyles.modalContainer,
+            {
               backgroundColor: colors.background,
-              transform: [{ translateY }]
-            }
+              transform: [{ translateY }],
+            },
           ]}
         >
-          <View {...panResponder.panHandlers} style={staticStyles.dragIndicatorContainer}>
-            <View style={[staticStyles.dragIndicator, { backgroundColor: colors.border }]} />
+          <View
+            {...panResponder.panHandlers}
+            style={staticStyles.dragIndicatorContainer}
+          >
+            <View
+              style={[
+                staticStyles.dragIndicator,
+                { backgroundColor: colors.border },
+              ]}
+            />
           </View>
 
           <View style={staticStyles.headerContainer}>
@@ -475,8 +528,8 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
               <Text style={[staticStyles.title, { color: colors.textPrimary }]}>
                 {title || getContextSpecificTitle(type)}
               </Text>
-              <TouchableOpacity 
-                style={staticStyles.closeButton} 
+              <TouchableOpacity
+                style={staticStyles.closeButton}
                 onPress={onClose}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
@@ -485,17 +538,32 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
             </View>
 
             <TouchableOpacity
-              style={[staticStyles.createTaskButton, { backgroundColor: colors.secondary }]}
+              style={[
+                staticStyles.createTaskButton,
+                { backgroundColor: colors.secondary },
+              ]}
               onPress={() => setIsChatOpen(true)}
             >
-              <FontAwesome5 name="magic" size={14} color={colors.primary} style={staticStyles.buttonIcon} />
-              <Text style={[staticStyles.createTaskButtonText, { color: colors.primary }]}>
+              <FontAwesome5
+                name="magic"
+                size={14}
+                color={colors.primary}
+                style={staticStyles.buttonIcon}
+              />
+              <Text
+                style={[
+                  staticStyles.createTaskButtonText,
+                  { color: colors.primary },
+                ]}
+              >
                 Create Custom Task
               </Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={[staticStyles.description, { color: colors.textSecondary }]}>
+          <Text
+            style={[staticStyles.description, { color: colors.textSecondary }]}
+          >
             {description || getContextSpecificDescription(type)}
           </Text>
 
@@ -504,7 +572,10 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
               placeholder="Search tasks..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              style={[staticStyles.searchInput, { backgroundColor: colors.surface }]}
+              style={[
+                staticStyles.searchInput,
+                { backgroundColor: colors.surface },
+              ]}
               placeholderTextColor={colors.textSecondary}
               textColor={colors.textPrimary}
               theme={{
@@ -513,35 +584,48 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
                   text: colors.textPrimary,
                   placeholder: colors.textSecondary,
                   background: colors.surface,
-                }
+                },
               }}
-              left={<TextInput.Icon icon="magnify" color={colors.textSecondary} />}
+              left={
+                <TextInput.Icon icon="magnify" color={colors.textSecondary} />
+              }
               mode="outlined"
             />
 
             <View style={staticStyles.filtersContainer}>
-              <ScrollView 
-                horizontal 
+              <ScrollView
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={staticStyles.categoryFilters}
               >
                 <TouchableOpacity
                   style={[
                     staticStyles.categoryChip,
-                    { 
-                      backgroundColor: !categoryFilter && !showUserTasks ? colors.secondary : 'transparent',
+                    {
+                      backgroundColor:
+                        !categoryFilter && !showUserTasks
+                          ? colors.secondary
+                          : "transparent",
                       borderWidth: 1,
-                      borderColor: colors.primary
-                    }
+                      borderColor: colors.primary,
+                    },
                   ]}
                   onPress={() => {
                     setCategoryFilter(null);
                     setShowUserTasks(false);
                   }}
                 >
-                  <Text style={[staticStyles.categoryChipText, { 
-                    color: !categoryFilter && !showUserTasks ? colors.primary : colors.secondary
-                  }]}>
+                  <Text
+                    style={[
+                      staticStyles.categoryChipText,
+                      {
+                        color:
+                          !categoryFilter && !showUserTasks
+                            ? colors.primary
+                            : colors.secondary,
+                      },
+                    ]}
+                  >
                     All
                   </Text>
                 </TouchableOpacity>
@@ -549,50 +633,86 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
                 <TouchableOpacity
                   style={[
                     staticStyles.categoryChip,
-                    { 
-                      backgroundColor: showUserTasks ? colors.secondary : 'transparent',
+                    {
+                      backgroundColor: showUserTasks
+                        ? colors.secondary
+                        : "transparent",
                       borderWidth: 1,
-                      borderColor: colors.primary
-                    }
+                      borderColor: colors.primary,
+                    },
                   ]}
                   onPress={() => {
                     setShowUserTasks(true);
                     setCategoryFilter(null);
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <FontAwesome5 
-                      name="user-edit" 
-                      size={12} 
-                      color={showUserTasks ? colors.primary : colors.secondary} 
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <FontAwesome5
+                      name="user-edit"
+                      size={12}
+                      color={showUserTasks ? colors.primary : colors.secondary}
                     />
-                    <Text style={[staticStyles.categoryChipText, { 
-                      color: showUserTasks ? colors.primary : colors.secondary
-                    }]}>
+                    <Text
+                      style={[
+                        staticStyles.categoryChipText,
+                        {
+                          color: showUserTasks
+                            ? colors.primary
+                            : colors.secondary,
+                        },
+                      ]}
+                    >
                       My Created Tasks
                     </Text>
                   </View>
                 </TouchableOpacity>
 
-                {['physical', 'mental', 'intellectual', 'spiritual', 'career', 'relationships', 'financial'].map(category => (
+                {[
+                  "physical",
+                  "mental",
+                  "intellectual",
+                  "spiritual",
+                  "career",
+                  "relationships",
+                  "financial",
+                ].map((category) => (
                   <TouchableOpacity
                     key={category}
                     style={[
                       staticStyles.categoryChip,
-                      { 
-                        backgroundColor: categoryFilter === category ? colors.secondary : 'transparent',
+                      {
+                        backgroundColor:
+                          categoryFilter === category
+                            ? colors.secondary
+                            : "transparent",
                         borderWidth: 1,
-                        borderColor: colors.primary
-                      }
+                        borderColor: colors.primary,
+                      },
                     ]}
                     onPress={() => {
-                      setCategoryFilter(category === categoryFilter ? null : category);
+                      setCategoryFilter(
+                        category === categoryFilter ? null : category
+                      );
                       setShowUserTasks(false);
                     }}
                   >
-                    <Text style={[staticStyles.categoryChipText, { 
-                      color: categoryFilter === category ? colors.primary : colors.secondary
-                    }]}>
+                    <Text
+                      style={[
+                        staticStyles.categoryChipText,
+                        {
+                          color:
+                            categoryFilter === category
+                              ? colors.primary
+                              : colors.secondary,
+                        },
+                      ]}
+                    >
                       {category.charAt(0).toUpperCase() + category.slice(1)}
                     </Text>
                   </TouchableOpacity>
@@ -606,15 +726,20 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
               </View>
             ) : filteredTasks.length === 0 ? (
               <View style={staticStyles.emptyContainer}>
-                <Text style={[staticStyles.emptyText, { color: colors.textPrimary }]}>
-                  {searchQuery ? 'No tasks found' : 'No tasks available'}
+                <Text
+                  style={[
+                    staticStyles.emptyText,
+                    { color: colors.textPrimary },
+                  ]}
+                >
+                  {searchQuery ? "No tasks found" : "No tasks available"}
                 </Text>
               </View>
             ) : (
               <FlatList
                 data={filteredTasks}
                 renderItem={renderTaskItem}
-                keyExtractor={item => item.id}
+                keyExtractor={(item) => item.id}
                 contentContainerStyle={staticStyles.listContainer}
                 showsVerticalScrollIndicator={false}
               />
@@ -624,22 +749,28 @@ const AddTask: React.FC<Props> = ({ visible, onClose, type, mode, onTaskAdded, s
                 style={[
                   dynamicStyles.successContainer,
                   {
-                    transform: [{
-                      translateY: fadeAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-50, 0], // Slides down from above
-                      })
-                    }]
-                  }
+                    transform: [
+                      {
+                        translateY: fadeAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-50, 0], // Slides down from above
+                        }),
+                      },
+                    ],
+                  },
                 ]}
               >
                 <View style={dynamicStyles.successMessage}>
                   <FontAwesome5 name="check-circle" size={16} color="#fff" />
-                  <Text style={dynamicStyles.successText}>{successMessage}</Text>
+                  <Text style={dynamicStyles.successText}>
+                    {successMessage}
+                  </Text>
                 </View>
               </Animated.View>
             )}
-            {errorMessage && <ErrorMessage message={errorMessage} fadeAnim={errorAnim} />}
+            {errorMessage && (
+              <ErrorMessage message={errorMessage} fadeAnim={errorAnim} />
+            )}
           </SafeAreaView>
         </Animated.View>
 

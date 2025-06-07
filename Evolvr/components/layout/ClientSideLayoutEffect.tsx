@@ -1,7 +1,7 @@
-import React, { ReactNode, useEffect, useLayoutEffect } from 'react';
+import React, { ReactNode, useEffect, useLayoutEffect } from "react";
 
 const canUseDOM = !!(
-  typeof window !== 'undefined' &&
+  typeof window !== "undefined" &&
   window.document &&
   window.document.createElement
 );
@@ -14,7 +14,11 @@ interface Props {
   dependencies?: any[];
 }
 
-export function ClientSideLayoutEffect({ children, effect, dependencies = [] }: Props) {
+export function ClientSideLayoutEffect({
+  children,
+  effect,
+  dependencies = [],
+}: Props) {
   useIsomorphicLayoutEffect(effect, dependencies);
   return <>{children}</>;
-} 
+}

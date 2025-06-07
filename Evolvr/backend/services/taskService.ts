@@ -333,7 +333,7 @@ class TaskService {
       if (!userDoc.exists()) return [];
 
       const userData = userDoc.data();
-      return (userData.userGeneratedTasks || []).map((task) => ({
+      return (userData.userGeneratedTasks || []).map((task: Task) => ({
         ...task,
         type: "user-generated",
         createdBy: userId,

@@ -1,15 +1,20 @@
-import React from "react"
-import { Tabs } from "expo-router"
-import { FontAwesome5 } from "@expo/vector-icons"
-import { useTheme } from "@/context/ThemeContext"
-import { useAuth } from "@/context/AuthContext"
-import { Redirect } from "expo-router"
-import { View, StyleSheet, Image, Platform } from "react-native"
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+import React from "react";
+import { Tabs } from "expo-router";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
+import { Redirect } from "expo-router";
+import { View, StyleSheet, Image, Platform } from "react-native";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+
+interface TabBarIconProps {
+  focused: boolean;
+  color: string;
+}
 
 export default function TabsLayout() {
-  const { colors } = useTheme()
-  const { user, isLoading } = useAuth()
+  const { colors } = useTheme();
+  const { user, isLoading } = useAuth();
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -37,8 +42,8 @@ export default function TabsLayout() {
           },
           shadowOpacity: 0.1,
           shadowRadius: 3,
-          height: Platform.OS === 'ios' ? 85 : 65,
-          paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+          height: Platform.OS === "ios" ? 85 : 65,
+          paddingBottom: Platform.OS === "ios" ? 30 : 10,
           paddingTop: 10,
         },
         tabBarHideOnKeyboard: true,
@@ -51,11 +56,11 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          tabBarIcon: ({ focused, color }) => (
+          tabBarIcon: ({ focused, color }: TabBarIconProps) => (
             <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-              <FontAwesome5 
-                name="th-large" 
-                size={24} 
+              <FontAwesome5
+                name="th-large"
+                size={24}
                 color={color}
                 solid={focused}
               />
@@ -66,11 +71,11 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="evolve"
         options={{
-          tabBarIcon: ({ focused, color }) => (
+          tabBarIcon: ({ focused, color }: TabBarIconProps) => (
             <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-              <FontAwesome5 
-                name="bolt" 
-                size={24} 
+              <FontAwesome5
+                name="bolt"
+                size={24}
                 color={color}
                 solid={focused}
               />
@@ -81,11 +86,11 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="community"
         options={{
-          tabBarIcon: ({ focused, color }) => (
+          tabBarIcon: ({ focused, color }: TabBarIconProps) => (
             <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-              <FontAwesome5 
-                name="users" 
-                size={24} 
+              <FontAwesome5
+                name="users"
+                size={24}
                 color={color}
                 solid={focused}
               />
@@ -97,21 +102,21 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ focused, color }) => (
+          tabBarIcon: ({ focused, color }: TabBarIconProps) => (
             <View style={[styles.iconContainer, focused && styles.activeIcon]}>
               {user?.userData?.photoURL ? (
-                <Image 
+                <Image
                   source={{ uri: user.userData.photoURL }}
                   style={[
                     styles.avatar,
                     { borderColor: color },
-                    focused && styles.activeAvatar
+                    focused && styles.activeAvatar,
                   ]}
                 />
               ) : (
-                <FontAwesome5 
-                  name="user-circle" 
-                  size={24} 
+                <FontAwesome5
+                  name="user-circle"
+                  size={24}
                   color={color}
                   solid={focused}
                 />
@@ -128,8 +133,8 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 32,
     height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   activeIcon: {
     transform: [{ scale: 1.1 }],
@@ -144,5 +149,4 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.1 }],
     borderWidth: 2,
   },
-})
-
+});

@@ -1,34 +1,24 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": "@tsconfig/react-native/tsconfig.json",
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "moduleResolution": "bundler",
     "paths": {
       "@/*": [
         "./*"
-      ],
-      "@firebase/auth": [
-        "./node_modules/@firebase/auth/dist/auth.d.ts"
       ]
     },
-    "typeRoots": [
-      "./types",
-      "./node_modules/@types"
-    ]
+    "lib": [
+      "dom"
+    ],
+    "moduleResolution": "bundler",
+    "module": "esnext"
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    "types/**/*.d.ts",
     ".expo/types/**/*.ts",
+    ".expo/types/**/*.tsx",
     "expo-env.d.ts"
-  ],
-  "exclude": [
-    "node_modules"
   ]
 }

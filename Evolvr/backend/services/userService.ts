@@ -19,9 +19,15 @@ import type { UserData, UserStats, ProgressSnapshot } from "../types/UserData";
 import { FriendData } from "../types/Friend";
 import { postService } from "./postService";
 import { usernameService } from "./usernameService";
+import type { LevelService } from "../types/SharedTypes";
 import logger from "@/utils/logger";
 import Toast from "react-native-toast-message";
-import { levelService } from "./levelService";
+
+let levelService: LevelService;
+
+export const setLevelService = (service: LevelService) => {
+  levelService = service;
+};
 
 export const userService = {
   createUserData(data: Partial<UserData>) {

@@ -1,19 +1,22 @@
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  updateDoc,
+  getDoc,
+  writeBatch,
+  arrayUnion,
+  Timestamp,
+} from "firebase/firestore";
 import { db } from "@/backend/config/firebase";
 import { Alert } from "react-native";
 import { InitialLevels, UserLevels } from "@/backend/types/Level";
 import { UserData } from "../types/UserData";
 import { CategoryLevel } from "@/backend/types/Level";
 import { badgeService } from "./badgeService";
-import { userService } from "./userService";
 import { BadgeCheckParams } from "../types/Badge";
-import type { StreakService } from "../types/SharedTypes";
+import type { StreakService, UserService } from "../types/SharedTypes";
 import logger from "@/utils/logger";
 import Toast from "react-native-toast-message";
 import { queryClient } from "@/lib/queryClientInstance";
-import { writeBatch } from "firebase/firestore";
-import { arrayUnion } from "firebase/firestore";
-import { Timestamp } from "firebase/firestore";
 
 const XP_PER_LEVEL = 1000;
 const MAX_LEVEL = 100;
@@ -32,8 +35,14 @@ const PRESTIGE_REWARDS = {
 };
 
 let streakService: StreakService;
+let userService: UserService;
+
 export const setStreakService = (service: StreakService) => {
   streakService = service;
+};
+
+export const setUserService = (service: UserService) => {
+  userService = service;
 };
 
 // Instead, add a type for the habit service interface
