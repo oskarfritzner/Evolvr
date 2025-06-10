@@ -93,7 +93,6 @@ export default function HabitItem({
     <MotiView
       from={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: "timing", duration: 300 }}
       style={[
         styles.container,
         {
@@ -177,9 +176,31 @@ export default function HabitItem({
 
       {expanded && (
         <MotiView
-          from={{ height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          transition={{ type: "timing", duration: 200 }}
+          from={{
+            height: 0,
+            opacity: 0,
+            scale: 0.95,
+          }}
+          animate={{
+            height: "auto",
+            opacity: 1,
+            scale: 1,
+          }}
+          transition={{
+            height: {
+              type: "timing",
+              duration: 300,
+            },
+            opacity: {
+              type: "timing",
+              duration: 200,
+            },
+            scale: {
+              type: "spring",
+              delay: 50,
+              damping: 12,
+            },
+          }}
           style={styles.details}
         >
           <View style={styles.reasonContainer}>
@@ -238,8 +259,9 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
     borderWidth: 1,
+    marginBottom: 0,
+    backgroundColor: "transparent",
     overflow: "hidden",
-    marginBottom: 8,
   },
   header: {
     padding: Platform.OS === "ios" ? 12 : 10,
@@ -249,94 +271,89 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  titleSection: {
-    flex: 1,
-    marginRight: 12,
-  },
-  title: {
-    fontSize: Platform.OS === "ios" ? 15 : 14,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: Platform.OS === "ios" ? 13 : 12,
-    opacity: 0.7,
-  },
-  rightSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  streakBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 8,
-    minWidth: 32,
-    alignItems: "center",
-  },
-  streakText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  statusDotContainer: {
-    padding: 4,
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-  },
-  deleteButton: {
-    padding: 4,
+  details: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   expandSection: {
     alignItems: "center",
     marginTop: 8,
   },
-  details: {
-    padding: 12,
-    paddingTop: 0,
+  titleSection: {
+    flex: 1,
+    marginRight: 12,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 13,
+    opacity: 0.8,
+  },
+  rightSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  streakBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  streakText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  statusDotContainer: {
+    padding: 4,
+  },
+  statusDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+  },
+  deleteButton: {
+    padding: 4,
   },
   reasonContainer: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   reasonLabel: {
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 12,
     marginBottom: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    opacity: 0.7,
   },
   reasonText: {
-    fontSize: Platform.OS === "ios" ? 14 : 13,
-    lineHeight: Platform.OS === "ios" ? 20 : 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
   progressContainer: {
     marginTop: 8,
   },
   progressLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    marginBottom: 8,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    fontSize: 12,
+    marginBottom: 12,
+    opacity: 0.7,
   },
   completionGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 4,
+    alignItems: "center",
   },
   dayBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 6,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
   dayText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "500",
   },
 });

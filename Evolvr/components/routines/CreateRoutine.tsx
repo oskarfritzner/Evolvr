@@ -29,6 +29,8 @@ import { useFriends } from "@/hooks/queries/useFriends";
 import { FriendData } from "@/backend/types/Friend";
 import type Task from "@/backend/types/Task";
 import AddTask from "@/components/tasks/addTask";
+import { Button, TextInput as PaperTextInput } from "react-native-paper";
+import { blue200 } from "react-native-paper/lib/typescript/styles/themes/v2/colors";
 
 interface Friend {
   userId: string;
@@ -36,7 +38,7 @@ interface Friend {
   photoURL?: string;
 }
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface Props {
   visible: boolean;
@@ -60,6 +62,7 @@ const CreateRoutine: React.FC<Props> = ({
     updateRoutineDescription,
     updateRoutineTasks,
     clearRoutine,
+    addTaskToRoutine,
   } = useRoutine();
 
   // 2. Query hooks
@@ -115,30 +118,30 @@ const CreateRoutine: React.FC<Props> = ({
         } else {
           showErrorMessage("Routine not found");
         }
-      } else {
-        clearRoutine();
       }
       setIsLoading(false);
     };
 
-    loadRoutine();
-    return () => {
-      clearRoutine();
-    };
-  }, [routine, user?.userData?.cachedRoutines]);
+    if (visible) {
+      loadRoutine();
+    }
+  }, [routine, user?.userData?.cachedRoutines, visible]);
 
+  // Single effect to handle modal visibility changes
   useEffect(() => {
     if (!visible) {
-      // Reset form when modal is closed
+      // Reset all state when modal is closed
       setSelectedTask(null);
       setValidationMessage("");
-      setShowAddTask(false);
       setShowInfo(false);
       setShowFriendSelector(false);
       setShowDayPicker(false);
+      setShowAddTask(false);
+      clearRoutine();
     }
   }, [visible]);
 
+  // Success message animation effect
   useEffect(() => {
     if (successMessage) {
       Animated.sequence([
@@ -185,13 +188,16 @@ const CreateRoutine: React.FC<Props> = ({
   }, []);
 
   const handleDayToggle = useCallback(
-    (taskId: string, dayIndex: number, e: any) => {
+    (taskId: string, displayIndex: number, e: any) => {
       e.stopPropagation();
+      // Convert display index (Mon=0) to storage index (Sun=0)
+      const storageIndex = displayIndex === 6 ? 0 : displayIndex + 1;
+
       const updatedTasks = currentRoutine.tasks.map((task) => {
         if (task.id === taskId) {
-          const newDays = task.days.includes(dayIndex)
-            ? task.days.filter((d) => d !== dayIndex)
-            : [...task.days, dayIndex];
+          const newDays = task.days.includes(storageIndex)
+            ? task.days.filter((d) => d !== storageIndex)
+            : [...task.days, storageIndex];
           return { ...task, days: newDays };
         }
         return task;
@@ -283,15 +289,18 @@ const CreateRoutine: React.FC<Props> = ({
   );
 
   const handleTaskAdded = useCallback(
-    (task: Task) => {
-      if (!task) return;
+    (task?: Task) => {
+      console.log("CreateRoutine - handleTaskAdded called with task:", task);
+      if (!task) {
+        console.log("CreateRoutine - No task provided, returning");
+        return;
+      }
 
       // Create a complete RoutineTask with all required properties
       const newTask: RoutineTask = {
+        ...task,
         id: task.id || generateId(),
-        title: task.title,
-        description: task.description || "",
-        days: [],
+        days: [0, 1, 2, 3, 4, 5, 6], // Default to all days selected
         completed: false,
         routineId: routine?.id || "",
         routineName: currentRoutine.name || "",
@@ -306,8 +315,19 @@ const CreateRoutine: React.FC<Props> = ({
         status: task.status,
       };
 
-      const updatedTasks = [...currentRoutine.tasks, newTask];
-      updateRoutineTasks(updatedTasks);
+      console.log("CreateRoutine - Created new routine task:", newTask);
+      console.log(
+        "CreateRoutine - Current routine tasks:",
+        currentRoutine.tasks
+      );
+
+      // Add the task to the routine using the context function
+      console.log("CreateRoutine - Calling addTaskToRoutine");
+      addTaskToRoutine(newTask);
+      console.log("CreateRoutine - addTaskToRoutine completed");
+
+      // Close the add task modal
+      console.log("CreateRoutine - Closing AddTask modal");
       setShowAddTask(false);
     },
     [
@@ -316,7 +336,7 @@ const CreateRoutine: React.FC<Props> = ({
       routine?.id,
       routine?.participants,
       user?.uid,
-      updateRoutineTasks,
+      addTaskToRoutine,
     ]
   );
 
@@ -411,27 +431,46 @@ const CreateRoutine: React.FC<Props> = ({
   // 8. Render methods
   const renderDays = (task: RoutineTask) => {
     return (
-      <View style={styles.daysContainer}>
-        {DAYS.map((day, index) => (
-          <TouchableOpacity
-            key={`${task.id}-${day}`}
-            style={[
-              styles.dayChip,
-              task.days.includes(index) && { backgroundColor: colors.primary },
-            ]}
-            onPress={(e) => handleDayToggle(task.id, index, e)}
-            disabled={isReadOnly}
-          >
-            <Text
-              style={[
-                styles.dayText,
-                task.days.includes(index) && { color: colors.background },
-              ]}
-            >
-              {day}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.daysRow}>
+        <TouchableOpacity
+          style={[styles.allButton, { borderColor: colors.border }]}
+          onPress={() => handleSetAll(task.id)}
+          disabled={isReadOnly}
+        >
+          <Text style={[styles.allButtonText, { color: colors.textSecondary }]}>
+            {task.days.length === 7 ? "Clear All" : "All Days"}
+          </Text>
+        </TouchableOpacity>
+        <View style={styles.daysContainer}>
+          {DAYS.map((day, displayIndex) => {
+            // Convert display index (Mon=0) to storage index (Sun=0)
+            const storageIndex = displayIndex === 6 ? 0 : displayIndex + 1;
+            const isSelected = task.days.includes(storageIndex);
+            return (
+              <TouchableOpacity
+                key={`${task.id}-${day}`}
+                style={[
+                  styles.dayChip,
+                  { borderColor: colors.border },
+                  isSelected && { backgroundColor: colors.secondary },
+                ]}
+                onPress={(e) => handleDayToggle(task.id, displayIndex, e)}
+                disabled={isReadOnly}
+              >
+                <Text
+                  style={[
+                    styles.dayText,
+                    {
+                      color: isSelected ? colors.surface : colors.textSecondary,
+                    },
+                  ]}
+                >
+                  {day}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     );
   };
@@ -522,191 +561,183 @@ const CreateRoutine: React.FC<Props> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.modalContainer}>
+      <View style={styles.overlay}>
         <View
-          style={[styles.modalContent, { backgroundColor: colors.surface }]}
+          style={[
+            styles.modalContainer,
+            { backgroundColor: colors.surface },
+            isDesktop && styles.modalContainerDesktop,
+          ]}
         >
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-              {isEditMode ? "Edit Routine" : "Create Routine"}
-            </Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={onClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Ionicons name="close" size={24} color={colors.textSecondary} />
+          </TouchableOpacity>
 
-          <ScrollView style={styles.scrollContent}>
-            <View style={styles.section}>
-              <Text
-                style={[styles.sectionTitle, { color: colors.textPrimary }]}
-              >
-                Basic Information
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={true}
+          >
+            <View style={styles.titleContainer}>
+              <Text style={[styles.title, { color: colors.secondary }]}>
+                {isEditMode ? "Edit Routine" : "Create Routine"}
               </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.surfaceContainerLow,
-                    borderColor: colors.border,
-                    color: colors.textPrimary,
-                  },
-                ]}
-                placeholder="Routine Name"
-                placeholderTextColor={colors.textSecondary}
-                value={currentRoutine.name}
-                onChangeText={handleNameChange}
-                editable={!isReadOnly}
-              />
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.textArea,
-                  {
-                    backgroundColor: colors.surfaceContainerLow,
-                    borderColor: colors.border,
-                    color: colors.textPrimary,
-                  },
-                ]}
-                placeholder="Description (optional)"
-                placeholderTextColor={colors.textSecondary}
-                value={currentRoutine.description}
-                onChangeText={handleDescriptionChange}
-                multiline
-                editable={!isReadOnly}
-              />
+              <TouchableOpacity
+                onPress={() => setShowInfo(true)}
+                style={styles.infoButton}
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={24}
+                  color={colors.secondary}
+                />
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text
-                  style={[styles.sectionTitle, { color: colors.textPrimary }]}
-                >
-                  Tasks
-                </Text>
-                {!isReadOnly && (
-                  <TouchableOpacity
+            <Text
+              style={[styles.instructionText, { color: colors.textSecondary }]}
+            >
+              Create a routine to organize your recurring tasks. You can set
+              specific days for each task and track your progress.
+            </Text>
+
+            <View style={isDesktop && styles.desktopLayout}>
+              <View style={isDesktop && styles.desktopColumn}>
+                <View style={styles.inputContainer}>
+                  <TextInput
                     style={[
-                      styles.addTaskButton,
+                      styles.input,
                       {
-                        backgroundColor: colors.surfaceContainerLow,
+                        backgroundColor: colors.surface,
                         borderColor: colors.border,
+                        color: colors.textPrimary,
                       },
                     ]}
-                    onPress={handleAddRoutineTask}
-                  >
-                    <Ionicons name="add" size={20} color={colors.secondary} />
-                    <Text
-                      style={[
-                        styles.addTaskText,
-                        { color: colors.textPrimary },
-                      ]}
-                    >
-                      Add Task
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                    placeholder="Enter routine name"
+                    placeholderTextColor={colors.textSecondary}
+                    value={currentRoutine.name}
+                    onChangeText={handleNameChange}
+                    editable={!isReadOnly}
+                  />
+                  <TextInput
+                    style={[
+                      styles.textArea,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                        color: colors.textPrimary,
+                      },
+                    ]}
+                    placeholder="Describe your routine (optional)"
+                    placeholderTextColor={colors.textSecondary}
+                    value={currentRoutine.description}
+                    onChangeText={handleDescriptionChange}
+                    multiline
+                    numberOfLines={4}
+                    editable={!isReadOnly}
+                  />
+                </View>
               </View>
 
-              {currentRoutine.tasks.length === 0 ? (
-                <Text
-                  style={[styles.emptyText, { color: colors.textSecondary }]}
-                >
-                  No tasks added yet
+              <View style={isDesktop && styles.desktopColumn}>
+                <Text style={[styles.subtitle, { color: colors.textPrimary }]}>
+                  Tasks
                 </Text>
-              ) : (
-                <View style={styles.taskList}>
-                  {currentRoutine.tasks.map((task) => (
+                <View style={styles.inputContainer}>
+                  {currentRoutine.tasks.length === 0 ? (
                     <TouchableOpacity
-                      key={task.id}
                       style={[
-                        styles.taskItem,
-                        {
-                          backgroundColor: colors.surfaceContainerLow,
-                          borderColor: colors.border,
-                        },
+                        styles.emptyState,
+                        { borderColor: colors.border },
                       ]}
-                      onPress={() => handleTaskPress(task)}
+                      onPress={handleAddRoutineTask}
+                      disabled={isReadOnly}
                     >
                       <Text
                         style={[
-                          styles.taskTitle,
-                          { color: colors.textPrimary },
+                          styles.emptyStateText,
+                          { color: colors.textSecondary },
                         ]}
                       >
-                        {task.title}
+                        No tasks added yet. Tap to add one!
                       </Text>
                     </TouchableOpacity>
-                  ))}
+                  ) : (
+                    <View style={styles.taskList}>
+                      {currentRoutine.tasks.map((task) => (
+                        <View
+                          key={task.id}
+                          style={[
+                            styles.taskItem,
+                            { backgroundColor: colors.surfaceContainerLow },
+                          ]}
+                        >
+                          <View style={styles.taskHeader}>
+                            <TouchableOpacity
+                              onPress={() => handleTaskPress(task)}
+                              style={styles.taskTitleContainer}
+                            >
+                              <Text
+                                style={[
+                                  styles.taskTitle,
+                                  { color: colors.textPrimary },
+                                ]}
+                                numberOfLines={2}
+                              >
+                                {task.title}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => handleRemoveTask(task.id)}
+                              style={styles.removeButton}
+                              disabled={isReadOnly}
+                            >
+                              <FontAwesome5
+                                name="times"
+                                size={16}
+                                color={colors.error}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                          {renderDays(task)}
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-
-            {!isReadOnly && (
-              <View style={[styles.footer, { borderTopColor: colors.border }]}>
-                <TouchableOpacity
-                  style={[styles.button, { backgroundColor: colors.secondary }]}
-                  onPress={handleSubmit}
-                  disabled={isCreating || isUpdating}
-                >
-                  <Text style={[styles.buttonText, { color: colors.surface }]}>
-                    {isCreating || isUpdating
-                      ? "Saving..."
-                      : isEditMode
-                      ? "Save Changes"
-                      : "Create Routine"}
-                  </Text>
-                </TouchableOpacity>
               </View>
-            )}
+            </View>
           </ScrollView>
 
-          {validationMessage && (
-            <Text style={[styles.validationMessage, { color: colors.error }]}>
-              {validationMessage}
-            </Text>
-          )}
-
-          <Animated.View
+          <View
             style={[
-              styles.successMessage,
+              styles.buttonContainer,
               {
-                opacity: fadeAnim,
-                transform: [
-                  {
-                    translateY: fadeAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-20, 0],
-                    }),
-                  },
-                ],
+                backgroundColor: colors.surface,
+                borderTopColor: colors.border,
               },
             ]}
           >
-            <Text style={styles.successText}>{successMessage}</Text>
-          </Animated.View>
-
-          <Animated.View
-            style={[
-              styles.errorMessage,
-              {
-                opacity: errorAnim,
-                transform: [
-                  {
-                    translateY: errorAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-20, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          </Animated.View>
+            <Button
+              mode="contained"
+              onPress={handleSubmit}
+              loading={isCreating || isUpdating}
+              disabled={
+                !currentRoutine.name.trim() ||
+                currentRoutine.tasks.length === 0 ||
+                isCreating ||
+                isUpdating
+              }
+              style={[styles.button, { backgroundColor: colors.secondary }]}
+              textColor={colors.surface}
+            >
+              {isCreating || isUpdating
+                ? "Saving..."
+                : isEditMode
+                ? "Save Changes"
+                : "Create Routine"}
+            </Button>
+          </View>
         </View>
       </View>
 
@@ -717,26 +748,11 @@ const CreateRoutine: React.FC<Props> = ({
         content={INFO_CONTENT.routine.content}
       />
 
-      <FriendShareModal
-        visible={showFriendSelector}
-        onDismiss={() => setShowFriendSelector(false)}
-        onShare={handleFriendSelect}
-        friends={friends.map((f) => ({
-          id: f.userId,
-          name: f.displayName,
-          avatar: f.photoURL,
-        }))}
-      />
-
       <AddTask
         visible={showAddTask}
         onClose={() => setShowAddTask(false)}
         type="routine"
-        onTaskAdded={(task) => {
-          if (task) {
-            handleTaskAdded(task);
-          }
-        }}
+        onTaskAdded={handleTaskAdded}
         title="Add Task to Routine"
         description="Select tasks to add to your routine. You can set specific days for each task later."
       />
@@ -747,14 +763,13 @@ const CreateRoutine: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  overlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 16,
   },
-  modalContent: {
+  modalContainer: {
     backgroundColor: "#fff",
     borderRadius: 16,
     width: "100%",
@@ -775,152 +790,156 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "600",
+  modalContainerDesktop: {
+    ...Platform.select({
+      web: {
+        width: "90%",
+        maxWidth: 800,
+      },
+      default: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+      },
+    }),
   },
   closeButton: {
     padding: 8,
   },
+  scrollView: {
+    padding: 20,
+  },
   scrollContent: {
     padding: 20,
   },
-  section: {
+  titleContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 18,
+  title: {
+    fontSize: 24,
     fontWeight: "600",
-    marginBottom: 12,
+  },
+  infoButton: {
+    padding: 4,
+  },
+  instructionText: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  desktopLayout: {
+    flexDirection: "row",
+    gap: 24,
+  },
+  desktopColumn: {
+    flex: 1,
+  },
+  inputContainer: {
+    marginBottom: 24,
   },
   input: {
-    borderWidth: 1,
-    borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    marginBottom: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderRadius: 8,
   },
   textArea: {
-    height: 100,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    minHeight: 100,
     textAlignVertical: "top",
   },
-  dayPickerGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12,
-    justifyContent: "space-between",
-  },
-  dayButton: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  dayButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
   taskList: {
-    marginTop: 16,
-  },
-  taskItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-  },
-  taskContent: {
     gap: 12,
   },
-  taskTitle: {
+  taskItem: {
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  taskHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    paddingBottom: 8,
+  },
+  taskTitleContainer: {
     flex: 1,
+    marginRight: 12,
+  },
+  taskTitle: {
     fontSize: 16,
+    fontWeight: "500",
+    flex: 1,
+    marginRight: 8,
+  },
+  removeButton: {
+    padding: 8,
+    borderRadius: 20,
+  },
+  daysRow: {
+    padding: 16,
+    paddingTop: 0,
+  },
+  allButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 8,
+    alignSelf: "flex-start",
+  },
+  allButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
   daysContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginTop: 8,
+    justifyContent: "space-between",
   },
   dayChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    flex: 1,
+    minWidth: "13%",
+    maxWidth: 55,
+    paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
+    alignItems: "center",
   },
   dayText: {
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  taskActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  taskActionButton: {
-    padding: 8,
-  },
-  taskActionText: {
     fontSize: 14,
     fontWeight: "500",
   },
-  emptyTasks: {
-    padding: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: "dashed",
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: "center",
-  },
-  friendsList: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  friendChip: {
+  addTaskButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  friendName: {
-    fontSize: 14,
-  },
-  emptyFriends: {
-    padding: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: "dashed",
-  },
-  validationMessage: {
-    color: "#ef4444",
+    padding: 12,
+    borderRadius: 8,
     marginTop: 8,
-    fontSize: 14,
+    borderWidth: 1,
+    borderStyle: "dashed",
   },
-  footer: {
+  addTaskContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  addTaskText: {
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  buttonContainer: {
     padding: 20,
     borderTopWidth: 1,
     flexDirection: "row",
@@ -933,57 +952,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  infoButton: {
-    padding: 4,
-  },
-  titleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  addTaskButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    borderWidth: 1,
-    borderStyle: "dashed",
-  },
-  addTaskText: {
-    marginLeft: 8,
-    fontSize: 16,
-  },
-  selectAllButton: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 24,
-  },
-  selectAllText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  doneButton: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 12,
-  },
-  doneText: {
-    fontSize: 14,
-    fontWeight: "600",
   },
   modalOverlay: {
     flex: 1,
@@ -1003,31 +971,60 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlign: "center",
   },
-  successMessage: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    zIndex: 1000,
+  dayPickerGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+    justifyContent: "space-between",
   },
-  successText: {
-    color: "#2ecc71",
-    fontSize: 18,
+  dayButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  dayButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  doneButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  doneText: {
+    fontSize: 14,
     fontWeight: "600",
   },
-  errorMessage: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    zIndex: 1000,
-  },
-  errorText: {
-    color: "#ef4444",
+  subtitle: {
     fontSize: 18,
     fontWeight: "600",
+    marginBottom: 12,
+  },
+  emptyState: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: "dashed",
+  },
+  emptyStateText: {
+    marginLeft: 8,
+    fontSize: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+    lineHeight: 20,
   },
 });
 

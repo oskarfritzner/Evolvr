@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useMemo, useCallback } from "react";
+import { View } from "react-native";
 import type Task from "@/backend/types/Task";
 import type { RoutineTaskWithMeta } from "@/backend/types/Routine";
 import type { ChallengeTask } from "@/backend/types/Challenge";
@@ -194,7 +195,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <TaskContext.Provider value={contextValue}>{children}</TaskContext.Provider>
+    <React.Fragment>
+      <TaskContext.Provider value={contextValue}>
+        {children}
+      </TaskContext.Provider>
+    </React.Fragment>
   );
 }
 

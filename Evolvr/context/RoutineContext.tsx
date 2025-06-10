@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
+import { View } from "react-native";
 import type { RoutineTask } from "@/backend/types/Routine";
 
 interface RoutineContextType {
@@ -47,26 +48,34 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearRoutine = () => {
-    setCurrentRoutine({
-      name: "",
-      description: "",
-      tasks: [],
-    });
+    if (
+      currentRoutine.name !== "" ||
+      currentRoutine.description !== "" ||
+      currentRoutine.tasks.length > 0
+    ) {
+      setCurrentRoutine({
+        name: "",
+        description: "",
+        tasks: [],
+      });
+    }
+  };
+
+  const value = {
+    currentRoutine,
+    addTaskToRoutine,
+    updateRoutineName,
+    updateRoutineDescription,
+    updateRoutineTasks,
+    clearRoutine,
   };
 
   return (
-    <RoutineContext.Provider
-      value={{
-        currentRoutine,
-        addTaskToRoutine,
-        updateRoutineName,
-        updateRoutineDescription,
-        updateRoutineTasks,
-        clearRoutine,
-      }}
-    >
-      {children}
-    </RoutineContext.Provider>
+    <React.Fragment>
+      <RoutineContext.Provider value={value}>
+        {children}
+      </RoutineContext.Provider>
+    </React.Fragment>
   );
 }
 

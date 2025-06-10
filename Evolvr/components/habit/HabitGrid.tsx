@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  View,
 } from "react-native";
 import HabitItem from "./HabitItem";
 import MissedHabitsAlert from "./MissedHabitsAlert";
@@ -109,53 +110,62 @@ export default function HabitGrid({
 
   return (
     <>
-      {/* Show missed habits alert if there are any and not dismissed */}
-      {showMissedAlert && missedHabits && missedHabits.length > 0 ? (
-        <MissedHabitsAlert
-          missedHabits={missedHabits}
-          onDismiss={handleDismissMissedAlert}
-        />
-      ) : null}
-
-      <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-        contentContainerStyle={styles.container}
-      >
-        {habits.map((habit) => (
-          <MotiView
-            key={habit.id}
-            from={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{
-              opacity: {
-                type: "timing",
-                duration: 300,
-                easing: Easing.bezier(0.2, 0.65, 0.5, 0.9),
-              },
-              scale: {
-                type: "timing",
-                duration: 300,
-                easing: Easing.bezier(0.2, 0.65, 0.5, 0.9),
-              },
-            }}
-          >
-            <HabitItem
-              habit={habit}
-              onRefresh={handleRefresh}
-              onDelete={() => handleDelete(habit.id)}
-              onComplete={handleHabitComplete}
-            />
-          </MotiView>
-        ))}
-      </ScrollView>
+      <View style={{ flex: 1 }}>
+        {showMissedAlert && missedHabits && missedHabits.length > 0 && (
+          <MissedHabitsAlert
+            missedHabits={missedHabits}
+            onDismiss={handleDismissMissedAlert}
+          />
+        )}
+        <ScrollView
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          contentContainerStyle={styles.container}
+        >
+          <View style={styles.habitsContainer}>
+            {habits.map((habit) => (
+              <React.Fragment key={habit.id}>
+                <MotiView
+                  from={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{
+                    opacity: {
+                      type: "timing",
+                      duration: 300,
+                      easing: Easing.bezier(0.2, 0.65, 0.5, 0.9),
+                    },
+                    scale: {
+                      type: "timing",
+                      duration: 300,
+                      easing: Easing.bezier(0.2, 0.65, 0.5, 0.9),
+                    },
+                  }}
+                >
+                  <HabitItem
+                    habit={habit}
+                    onRefresh={handleRefresh}
+                    onDelete={() => handleDelete(habit.id)}
+                    onComplete={handleHabitComplete}
+                  />
+                </MotiView>
+              </React.Fragment>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flexGrow: 1,
+    padding: 16,
+  },
+  habitsContainer: {
     gap: 16,
+    width: "100%",
+    flexGrow: 1,
   },
 });

@@ -1,12 +1,5 @@
-import React, { ReactNode, useEffect, useLayoutEffect } from "react";
-
-const canUseDOM = !!(
-  typeof window !== "undefined" &&
-  window.document &&
-  window.document.createElement
-);
-
-const useIsomorphicLayoutEffect = canUseDOM ? useLayoutEffect : useEffect;
+import React, { ReactNode, useEffect } from "react";
+import { View } from "react-native";
 
 interface Props {
   children: ReactNode;
@@ -19,6 +12,15 @@ export function ClientSideLayoutEffect({
   effect,
   dependencies = [],
 }: Props) {
-  useIsomorphicLayoutEffect(effect, dependencies);
-  return <>{children}</>;
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      return effect();
+    }
+  }, dependencies);
+
+  return (
+    <React.Fragment>
+      <View style={{ flex: 1 }}>{children}</View>
+    </React.Fragment>
+  );
 }

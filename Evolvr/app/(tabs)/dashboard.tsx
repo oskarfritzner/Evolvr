@@ -6,6 +6,7 @@ import {
   ScrollView,
   Platform,
   TouchableOpacity,
+  RefreshControl,
 } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
@@ -231,7 +232,8 @@ export default function Dashboard() {
             <Text
               style={[styles(colors).headerText, { color: colors.textPrimary }]}
             >
-              Welcome back, {userData?.username || "User"}
+              Welcome back,{" "}
+              {Boolean(userData?.username) ? userData.username : "User"}
             </Text>
             <Text
               style={[
@@ -257,31 +259,29 @@ export default function Dashboard() {
             <View
               style={[styles(colors).card, { backgroundColor: colors.surface }]}
             >
-              <Text
-                style={[
-                  styles(colors).sectionTitle,
-                  { color: colors.textPrimary },
-                ]}
-              >
-                Routines
-              </Text>
-              <RoutineGrid
-                compact={true}
-                onItemPress={(routine) => {
-                  router.push(
-                    `/(routinePages)/routineDetails/${routine.id}` as any
-                  );
-                }}
-              />
+              <View style={{ flex: 1 }}>
+                <RoutineGrid
+                  compact={true}
+                  onItemPress={(routine) => {
+                    router.push(
+                      `/(routinePages)/routineDetails/${routine.id}` as any
+                    );
+                  }}
+                />
+              </View>
             </View>
 
             {/* Habits Section */}
-            <View style={styles(colors).card}>
+            <View
+              style={[styles(colors).card, { backgroundColor: colors.surface }]}
+            >
               <AllHabits compact={true} />
             </View>
 
             {/* Challenges Section */}
-            <View style={styles(colors).card}>
+            <View
+              style={[styles(colors).card, { backgroundColor: colors.surface }]}
+            >
               <ChallengeGrid compact={true} />
             </View>
           </View>
@@ -296,7 +296,6 @@ export default function Dashboard() {
           />
 
           {/* Welcome Modal which open the first time the user enters after onboarding*/}
-
           <WelcomeModal
             visible={showWelcomeModal}
             onClose={() => {
@@ -368,7 +367,6 @@ const styles = (colors: any) =>
         flex: 1,
         minWidth: 300,
         borderRadius: 12,
-        padding: 16,
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
@@ -377,12 +375,11 @@ const styles = (colors: any) =>
         shadowOpacity: 0.1,
         shadowRadius: 3.84,
         elevation: 5,
-        overflow: "hidden",
+        overflow: "visible",
       },
       default: {
         width: "100%",
         borderRadius: 12,
-        padding: 16,
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
@@ -391,7 +388,7 @@ const styles = (colors: any) =>
         shadowOpacity: 0.1,
         shadowRadius: 3.84,
         elevation: 5,
-        overflow: "hidden",
+        overflow: "visible",
       },
     }),
     section: {

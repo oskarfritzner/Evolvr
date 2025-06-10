@@ -13,8 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { initializeServices } from "@/backend/services/initServices";
 import { ClientSideLayoutEffect } from "@/components/layout/ClientSideLayoutEffect";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-import { LogBox } from "react-native";
-import { View, Text, StyleSheet } from "react-native";
+import { LogBox, View, StyleSheet } from "react-native";
 
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -96,18 +95,23 @@ const toastConfig = {
       text2Style={toastStyles.text2}
     />
   ),
+  info: (props: any) => (
+    <BaseToast
+      {...props}
+      style={{
+        ...toastStyles.container,
+        borderLeftColor: paperTheme.colors.primary,
+        backgroundColor: "#FFFFFF",
+      }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={toastStyles.text1}
+      text2Style={toastStyles.text2}
+    />
+  ),
 };
 
 // Ignore specific warnings
 LogBox.ignoreLogs(["Animated: `useNativeDriver`"]);
-
-// Create a client-side only Toast wrapper
-function ClientSideToast() {
-  const canUseDOM = typeof window !== "undefined";
-  if (!canUseDOM) return null;
-
-  return <Toast config={toastConfig} />;
-}
 
 export default function RootLayout() {
   useEffect(() => {
@@ -130,33 +134,35 @@ export default function RootLayout() {
                   <TaskProvider>
                     <RoutineProvider>
                       <BottomSheetModalProvider>
-                        <Stack screenOptions={{ headerShown: false }}>
-                          <Stack.Screen
-                            name="(auth)"
-                            options={{ headerShown: false }}
-                          />
-                          <Stack.Screen
-                            name="(tabs)"
-                            options={{ headerShown: false }}
-                          />
-                          <Stack.Screen
-                            name="(modals)"
-                            options={{ headerShown: false }}
-                          />
-                          <Stack.Screen
-                            name="(profile)"
-                            options={{ headerShown: false }}
-                          />
-                          <Stack.Screen
-                            name="(categoryPages)"
-                            options={{ headerShown: false }}
-                          />
-                          <Stack.Screen
-                            name="index"
-                            options={{ headerShown: false }}
-                          />
-                        </Stack>
-                        <ClientSideToast />
+                        <View style={{ flex: 1 }}>
+                          <Stack screenOptions={{ headerShown: false }}>
+                            <Stack.Screen
+                              name="(auth)"
+                              options={{ headerShown: false }}
+                            />
+                            <Stack.Screen
+                              name="(tabs)"
+                              options={{ headerShown: false }}
+                            />
+                            <Stack.Screen
+                              name="(modals)"
+                              options={{ headerShown: false }}
+                            />
+                            <Stack.Screen
+                              name="(profile)"
+                              options={{ headerShown: false }}
+                            />
+                            <Stack.Screen
+                              name="(categoryPages)"
+                              options={{ headerShown: false }}
+                            />
+                            <Stack.Screen
+                              name="index"
+                              options={{ headerShown: false }}
+                            />
+                          </Stack>
+                          <Toast config={toastConfig} />
+                        </View>
                       </BottomSheetModalProvider>
                     </RoutineProvider>
                   </TaskProvider>

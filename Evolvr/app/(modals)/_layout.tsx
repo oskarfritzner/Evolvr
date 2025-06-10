@@ -1,82 +1,93 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
-import { Platform, TouchableOpacity } from 'react-native';
-import { useClientLayoutEffect } from '@/hooks/utils/useClientLayoutEffect';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { Platform, TouchableOpacity } from "react-native";
+import { useClientLayoutEffect } from "@/hooks/utils/useClientLayoutEffect";
+import { FontAwesome5 } from "@expo/vector-icons";
 
 export default function ModalsLayout() {
   const { colors } = useTheme();
   const router = useRouter();
-  
+
   useClientLayoutEffect(() => {
     // Handle modal animation setup if needed
   }, []);
 
   return (
-    <Stack 
+    <Stack
       screenOptions={{
-        presentation: 'modal',
+        presentation: "modal",
         headerShown: false,
         headerStyle: {
           backgroundColor: colors.background,
         },
         headerTintColor: colors.textPrimary,
-        animation: 'slide_from_bottom',
+        animation: "slide_from_bottom",
         gestureEnabled: true,
-        gestureDirection: 'vertical',
-        animationTypeForReplace: 'push',
+        gestureDirection: "vertical",
+        animationTypeForReplace: "push",
       }}
     >
-      <Stack.Screen 
-        name="create-post" 
+      <Stack.Screen
+        name="create-post"
         options={{
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
+          presentation: "modal",
+          animation: "slide_from_bottom",
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
+        name="create-routine"
+        options={{
+          presentation: "transparentModal",
+          animation: "fade",
+          contentStyle: {
+            backgroundColor: "transparent",
+          },
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="friends"
         options={{
           headerShown: true,
-          presentation: 'card',
-          animation: 'slide_from_right',
+          presentation: "card",
+          animation: "slide_from_right",
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="notifications"
         options={{
-          headerShown: true
+          headerShown: true,
         }}
       />
-      <Stack.Screen 
-        name="user-profile" 
+      <Stack.Screen
+        name="user-profile"
         options={{
-          animation: 'slide_from_right',
+          animation: "slide_from_right",
           headerShown: false,
-          presentation: 'card',
+          presentation: "card",
         }}
       />
-      <Stack.Screen 
-        name="challenge-list" 
+      <Stack.Screen
+        name="challenge-list"
         options={{
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
-          headerShown: true
+          presentation: "modal",
+          animation: "slide_from_bottom",
+          headerShown: true,
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="challenge"
         options={{
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
-          headerShown: true
+          presentation: "modal",
+          animation: "slide_from_bottom",
+          headerShown: true,
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="journal-history"
         options={{
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
+          presentation: "modal",
+          animation: "slide_from_bottom",
           headerShown: true,
           headerStyle: {
             backgroundColor: colors.background,
@@ -84,57 +95,57 @@ export default function ModalsLayout() {
           headerTintColor: colors.textPrimary,
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="terms-of-service"
         options={{
           headerShown: true,
-          title: 'Terms of Service',
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
+          title: "Terms of Service",
+          presentation: "modal",
+          animation: "slide_from_bottom",
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="privacy-policy"
         options={{
           headerShown: true,
-          title: 'Privacy Policy',
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
+          title: "Privacy Policy",
+          presentation: "modal",
+          animation: "slide_from_bottom",
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="theme-selector"
         options={{
           headerShown: true,
-          title: 'Select Theme',
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
+          title: "Select Theme",
+          presentation: "modal",
+          animation: "slide_from_bottom",
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="goals"
         options={{
           headerShown: true,
-          title: 'Goals',
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
+          title: "Goals",
+          presentation: "modal",
+          animation: "slide_from_bottom",
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="journal"
         options={{
           headerShown: true,
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
+          presentation: "modal",
+          animation: "slide_from_bottom",
         }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="edit-profile"
         options={{
           headerShown: true,
-          title: 'Edit Profile',
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
+          title: "Edit Profile",
+          presentation: "modal",
+          animation: "slide_from_bottom",
           headerStyle: {
             backgroundColor: colors.surface,
           },
@@ -142,7 +153,5 @@ export default function ModalsLayout() {
         }}
       />
     </Stack>
-
-    
   );
-} 
+}

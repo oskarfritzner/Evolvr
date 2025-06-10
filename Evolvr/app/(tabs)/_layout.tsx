@@ -27,105 +27,115 @@ export default function TabsLayout() {
   }
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          elevation: 8,
-          shadowColor: "#000",
-          shadowOffset: {
-            width: 0,
-            height: -2,
+    <React.Fragment>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            elevation: 8,
+            shadowColor: "#000",
+            shadowOffset: {
+              width: 0,
+              height: -2,
+            },
+            shadowOpacity: 0.1,
+            shadowRadius: 3,
+            height: Platform.OS === "ios" ? 85 : 65,
+            paddingBottom: Platform.OS === "ios" ? 30 : 10,
+            paddingTop: 10,
           },
-          shadowOpacity: 0.1,
-          shadowRadius: 3,
-          height: Platform.OS === "ios" ? 85 : 65,
-          paddingBottom: Platform.OS === "ios" ? 30 : 10,
-          paddingTop: 10,
-        },
-        tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: colors.secondary,
-        tabBarInactiveTintColor: colors.textSecondary,
-        tabBarShowLabel: false,
-        freezeOnBlur: true,
-      }}
-    >
-      <Tabs.Screen
-        name="dashboard"
-        options={{
-          tabBarIcon: ({ focused, color }: TabBarIconProps) => (
-            <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-              <FontAwesome5
-                name="th-large"
-                size={24}
-                color={color}
-                solid={focused}
-              />
-            </View>
-          ),
+          tabBarHideOnKeyboard: true,
+          tabBarActiveTintColor: colors.secondary,
+          tabBarInactiveTintColor: colors.textSecondary,
+          tabBarShowLabel: false,
+          freezeOnBlur: true,
         }}
-      />
-      <Tabs.Screen
-        name="evolve"
-        options={{
-          tabBarIcon: ({ focused, color }: TabBarIconProps) => (
-            <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-              <FontAwesome5
-                name="bolt"
-                size={24}
-                color={color}
-                solid={focused}
-              />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="community"
-        options={{
-          tabBarIcon: ({ focused, color }: TabBarIconProps) => (
-            <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-              <FontAwesome5
-                name="users"
-                size={24}
-                color={color}
-                solid={focused}
-              />
-            </View>
-          ),
-          tabBarAccessibilityLabel: "Community Tab",
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          tabBarIcon: ({ focused, color }: TabBarIconProps) => (
-            <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-              {user?.userData?.photoURL ? (
-                <Image
-                  source={{ uri: user.userData.photoURL }}
-                  style={[
-                    styles.avatar,
-                    { borderColor: color },
-                    focused && styles.activeAvatar,
-                  ]}
-                />
-              ) : (
+      >
+        <Tabs.Screen
+          name="dashboard"
+          options={{
+            tabBarIcon: ({ focused, color }: TabBarIconProps) => (
+              <View
+                style={[styles.iconContainer, focused && styles.activeIcon]}
+              >
                 <FontAwesome5
-                  name="user-circle"
+                  name="th-large"
                   size={24}
                   color={color}
                   solid={focused}
                 />
-              )}
-            </View>
-          ),
-        }}
-      />
-    </Tabs>
+              </View>
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="evolve"
+          options={{
+            tabBarIcon: ({ focused, color }: TabBarIconProps) => (
+              <View
+                style={[styles.iconContainer, focused && styles.activeIcon]}
+              >
+                <FontAwesome5
+                  name="bolt"
+                  size={24}
+                  color={color}
+                  solid={focused}
+                />
+              </View>
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="community"
+          options={{
+            tabBarIcon: ({ focused, color }: TabBarIconProps) => (
+              <View
+                style={[styles.iconContainer, focused && styles.activeIcon]}
+              >
+                <FontAwesome5
+                  name="users"
+                  size={24}
+                  color={color}
+                  solid={focused}
+                />
+              </View>
+            ),
+            tabBarAccessibilityLabel: "Community Tab",
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            tabBarIcon: ({ focused, color }: TabBarIconProps) => (
+              <View
+                style={[styles.iconContainer, focused && styles.activeIcon]}
+              >
+                {user?.userData?.photoURL ? (
+                  <Image
+                    source={{ uri: user.userData.photoURL }}
+                    style={[
+                      styles.avatar,
+                      { borderColor: color },
+                      focused && styles.activeAvatar,
+                    ]}
+                  />
+                ) : (
+                  <FontAwesome5
+                    name="user-circle"
+                    size={24}
+                    color={color}
+                    solid={focused}
+                  />
+                )}
+              </View>
+            ),
+          }}
+        />
+      </Tabs>
+    </React.Fragment>
   );
 }
 

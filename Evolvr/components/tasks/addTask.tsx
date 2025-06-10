@@ -386,17 +386,22 @@ const AddTask: React.FC<Props> = ({
   };
 
   const handleAddToRoutine = (task: Task) => {
+    console.log("AddTask - handleAddToRoutine called with task:", task);
     try {
       if (onTaskAdded) {
+        console.log("AddTask - Calling onTaskAdded callback");
         onTaskAdded(task);
-      }
-      showSuccessMessage("Task added to routine!");
-      if (mode === "edit") {
+        console.log("AddTask - onTaskAdded callback completed");
+        showSuccessMessage("Task added to routine!");
         setTimeout(() => {
+          console.log("AddTask - Closing modal");
           onClose();
-        }, 300);
+        }, 1000);
+      } else {
+        console.log("AddTask - onTaskAdded callback is not defined");
       }
     } catch (error) {
+      console.error("AddTask - Error in handleAddToRoutine:", error);
       if (error instanceof Error) {
         showErrorMessage(error.message);
       } else {
@@ -445,11 +450,7 @@ const AddTask: React.FC<Props> = ({
       selectedDays={type === "routine" ? [0, 1, 2, 3, 4, 5, 6] : undefined}
       onAddPress={async (taskId) => {
         if (type === "routine") {
-          if (onTaskAdded) {
-            onTaskAdded(item);
-            showSuccessMessage("Task added to routine!");
-            setTimeout(() => onClose(), 1000);
-          }
+          handleAddToRoutine(item);
         } else {
           await handleAddTask(taskId);
         }
@@ -495,26 +496,22 @@ const AddTask: React.FC<Props> = ({
   return (
     <Modal
       visible={visible}
-      transparent
-      animationType="none"
+      transparent={true}
+      animationType="fade"
       onRequestClose={onClose}
-      statusBarTranslucent
-      presentationStyle="overFullScreen"
     >
-      <SafeAreaViewRN style={staticStyles.overlay}>
+      <View style={staticStyles.overlay}>
         <Animated.View
           style={[
             staticStyles.modalContainer,
+            { backgroundColor: colors.background },
             {
-              backgroundColor: colors.background,
               transform: [{ translateY }],
             },
           ]}
+          {...panResponder.panHandlers}
         >
-          <View
-            {...panResponder.panHandlers}
-            style={staticStyles.dragIndicatorContainer}
-          >
+          <View style={staticStyles.dragIndicatorContainer}>
             <View
               style={[
                 staticStyles.dragIndicator,
@@ -523,266 +520,124 @@ const AddTask: React.FC<Props> = ({
             />
           </View>
 
-          <View style={staticStyles.headerContainer}>
-            <View style={staticStyles.headerTop}>
-              <Text style={[staticStyles.title, { color: colors.textPrimary }]}>
-                {title || getContextSpecificTitle(type)}
-              </Text>
-              <TouchableOpacity
-                style={staticStyles.closeButton}
-                onPress={onClose}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
+          <SafeAreaViewRN style={staticStyles.safeArea}>
+            <View style={staticStyles.headerContainer}>
+              <View style={staticStyles.headerTop}>
+                <Text
+                  style={[staticStyles.title, { color: colors.textPrimary }]}
+                >
+                  {title || getContextSpecificTitle(type)}
+                </Text>
+                <TouchableOpacity
+                  style={staticStyles.closeButton}
+                  onPress={onClose}
+                >
+                  <Ionicons
+                    name="close"
+                    size={24}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            <TouchableOpacity
+            <Text
               style={[
-                staticStyles.createTaskButton,
-                { backgroundColor: colors.secondary },
+                staticStyles.description,
+                { color: colors.textSecondary },
               ]}
-              onPress={() => setIsChatOpen(true)}
             >
-              <FontAwesome5
-                name="magic"
-                size={14}
-                color={colors.primary}
-                style={staticStyles.buttonIcon}
-              />
-              <Text
-                style={[
-                  staticStyles.createTaskButtonText,
-                  { color: colors.primary },
-                ]}
-              >
-                Create Custom Task
-              </Text>
-            </TouchableOpacity>
-          </View>
+              {description || getContextSpecificDescription(type)}
+            </Text>
 
-          <Text
-            style={[staticStyles.description, { color: colors.textSecondary }]}
-          >
-            {description || getContextSpecificDescription(type)}
-          </Text>
-
-          <SafeAreaView style={staticStyles.safeArea}>
             <TextInput
               placeholder="Search tasks..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              style={[
-                staticStyles.searchInput,
-                { backgroundColor: colors.surface },
-              ]}
-              placeholderTextColor={colors.textSecondary}
-              textColor={colors.textPrimary}
+              mode="outlined"
+              style={[staticStyles.searchInput]}
               theme={{
                 colors: {
-                  primary: colors.primary,
-                  text: colors.textPrimary,
+                  background: colors.surfaceContainerLow,
                   placeholder: colors.textSecondary,
-                  background: colors.surface,
+                  text: colors.textPrimary,
+                  primary: colors.secondary,
                 },
               }}
-              left={
-                <TextInput.Icon icon="magnify" color={colors.textSecondary} />
-              }
-              mode="outlined"
             />
 
             <View style={staticStyles.filtersContainer}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={staticStyles.categoryFilters}
+                style={staticStyles.categoryFilters}
               >
                 <TouchableOpacity
                   style={[
-                    staticStyles.categoryChip,
+                    staticStyles.myTasksChip,
                     {
-                      backgroundColor:
-                        !categoryFilter && !showUserTasks
-                          ? colors.secondary
-                          : "transparent",
-                      borderWidth: 1,
-                      borderColor: colors.primary,
+                      backgroundColor: showUserTasks
+                        ? colors.secondary + "20"
+                        : "transparent",
+                      borderColor: showUserTasks
+                        ? colors.secondary
+                        : colors.border,
                     },
                   ]}
-                  onPress={() => {
-                    setCategoryFilter(null);
-                    setShowUserTasks(false);
-                  }}
+                  onPress={() => setShowUserTasks(!showUserTasks)}
                 >
                   <Text
                     style={[
                       staticStyles.categoryChipText,
                       {
-                        color:
-                          !categoryFilter && !showUserTasks
-                            ? colors.primary
-                            : colors.secondary,
+                        color: showUserTasks
+                          ? colors.secondary
+                          : colors.textSecondary,
                       },
                     ]}
                   >
-                    All
+                    My Tasks
                   </Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    staticStyles.categoryChip,
-                    {
-                      backgroundColor: showUserTasks
-                        ? colors.secondary
-                        : "transparent",
-                      borderWidth: 1,
-                      borderColor: colors.primary,
-                    },
-                  ]}
-                  onPress={() => {
-                    setShowUserTasks(true);
-                    setCategoryFilter(null);
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <FontAwesome5
-                      name="user-edit"
-                      size={12}
-                      color={showUserTasks ? colors.primary : colors.secondary}
-                    />
-                    <Text
-                      style={[
-                        staticStyles.categoryChipText,
-                        {
-                          color: showUserTasks
-                            ? colors.primary
-                            : colors.secondary,
-                        },
-                      ]}
-                    >
-                      My Created Tasks
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                {[
-                  "physical",
-                  "mental",
-                  "intellectual",
-                  "spiritual",
-                  "career",
-                  "relationships",
-                  "financial",
-                ].map((category) => (
-                  <TouchableOpacity
-                    key={category}
-                    style={[
-                      staticStyles.categoryChip,
-                      {
-                        backgroundColor:
-                          categoryFilter === category
-                            ? colors.secondary
-                            : "transparent",
-                        borderWidth: 1,
-                        borderColor: colors.primary,
-                      },
-                    ]}
-                    onPress={() => {
-                      setCategoryFilter(
-                        category === categoryFilter ? null : category
-                      );
-                      setShowUserTasks(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        staticStyles.categoryChipText,
-                        {
-                          color:
-                            categoryFilter === category
-                              ? colors.primary
-                              : colors.secondary,
-                        },
-                      ]}
-                    >
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
               </ScrollView>
             </View>
 
             {loading ? (
               <View style={staticStyles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
+                <ActivityIndicator size="large" color={colors.secondary} />
               </View>
-            ) : filteredTasks.length === 0 ? (
+            ) : tasks.length === 0 ? (
               <View style={staticStyles.emptyContainer}>
                 <Text
                   style={[
                     staticStyles.emptyText,
-                    { color: colors.textPrimary },
+                    { color: colors.textSecondary },
                   ]}
                 >
-                  {searchQuery ? "No tasks found" : "No tasks available"}
+                  No tasks found
                 </Text>
               </View>
             ) : (
               <FlatList
-                data={filteredTasks}
+                data={tasks}
                 renderItem={renderTaskItem}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={staticStyles.listContainer}
                 showsVerticalScrollIndicator={false}
               />
             )}
-            {successMessage && (
-              <Animated.View
-                style={[
-                  dynamicStyles.successContainer,
-                  {
-                    transform: [
-                      {
-                        translateY: fadeAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-50, 0], // Slides down from above
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <View style={dynamicStyles.successMessage}>
-                  <FontAwesome5 name="check-circle" size={16} color="#fff" />
-                  <Text style={dynamicStyles.successText}>
-                    {successMessage}
-                  </Text>
-                </View>
-              </Animated.View>
-            )}
-            {errorMessage && (
-              <ErrorMessage message={errorMessage} fadeAnim={errorAnim} />
-            )}
-          </SafeAreaView>
+          </SafeAreaViewRN>
         </Animated.View>
+      </View>
 
-        <ChatModal
-          visible={isChatOpen}
-          onClose={() => {
-            setIsChatOpen(false);
-            loadTasks(); // Reload tasks to show any new ones
-          }}
-          mode="taskCreator"
-        />
-      </SafeAreaViewRN>
+      <ChatModal
+        visible={isChatOpen}
+        onClose={() => {
+          setIsChatOpen(false);
+          loadTasks(); // Reload tasks to show any new ones
+        }}
+        mode="taskCreator"
+      />
     </Modal>
   );
 };
