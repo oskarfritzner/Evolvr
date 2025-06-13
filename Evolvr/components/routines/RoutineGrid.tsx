@@ -22,6 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import RoutineCard from "./RoutineCard";
 import CreateRoutine from "./CreateRoutine";
+import EditRoutine from "./EditRoutine";
 import ConfirmationDialog from "@/components/common/ConfirmationDialog";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { MotiView } from "moti";
@@ -70,6 +71,8 @@ const RoutineGrid = ({
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
   const [deleteRoutineId, setDeleteRoutineId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "current">("all");
   const navigation = useNavigation();
@@ -128,6 +131,19 @@ const RoutineGrid = ({
 
   const handleRoutineCreated = () => {
     setCreateModalVisible(false);
+    queryClient.invalidateQueries({
+      queryKey: ["routines", user?.uid],
+    });
+  };
+
+  const handleRoutinePress = (routine: Routine) => {
+    setSelectedRoutine(routine);
+    setEditModalVisible(true);
+  };
+
+  const handleRoutineUpdated = () => {
+    setEditModalVisible(false);
+    setSelectedRoutine(null);
     queryClient.invalidateQueries({
       queryKey: ["routines", user?.uid],
     });
@@ -206,7 +222,7 @@ const RoutineGrid = ({
                 >
                   <RoutineCard
                     routine={routine}
-                    onPress={() => onItemPress?.(routine)}
+                    onPress={() => handleRoutinePress(routine)}
                     onDelete={() => setDeleteRoutineId(routine.id)}
                   />
                 </MotiView>
@@ -219,6 +235,17 @@ const RoutineGrid = ({
           onClose={() => setCreateModalVisible(false)}
           onRoutineCreated={handleRoutineCreated}
         />
+        {selectedRoutine && (
+          <EditRoutine
+            visible={editModalVisible}
+            onClose={() => {
+              setEditModalVisible(false);
+              setSelectedRoutine(null);
+            }}
+            routine={selectedRoutine}
+            onRoutineUpdated={handleRoutineUpdated}
+          />
+        )}
         <ConfirmationDialog
           visible={!!deleteRoutineId}
           title="Delete Routine"

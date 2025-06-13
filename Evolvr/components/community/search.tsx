@@ -31,8 +31,15 @@ import { UserData } from "@/backend/types/UserData";
 import { friendService } from "@/backend/services/friendService";
 import { Friend } from "@/backend/types/Friend";
 import { useFocusEffect } from "@react-navigation/native";
+import { Timestamp } from "firebase/firestore";
 
-type SearchType = "users" | "posts" | "tags" | "challenges" | "routines" | "habits";
+type SearchType =
+  | "users"
+  | "posts"
+  | "tags"
+  | "challenges"
+  | "routines"
+  | "habits";
 
 interface SearchProps {
   type: SearchType;
@@ -94,36 +101,71 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
       const searchTerm = searchQuery.toLowerCase();
 
       if (type === "users") {
-        // Get all users and filter client-side for now
-        const allUsersQuery = query(
+        // Create a compound query for better search results
+        const usersQuery = query(
           collection(db, "users"),
-          limit(20)
+          where("searchTerms", "array-contains", searchTerm),
+          orderBy("usernameLower"),
+          limit(resultLimit)
         );
-        
-        const allUsersSnapshot = await getDocs(allUsersQuery);
 
-        // Filter users client-side
-        const newResults = allUsersSnapshot.docs
-          .map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-            } as unknown as UserData;
-          })
-          .filter(user => {
-            if (!user?.username) return false;
-            const username = user.username.toLowerCase();
-            const displayName = (user.displayName || "").toLowerCase();
-            const email = (user.email || "").toLowerCase();
-            
-            return username.includes(searchTerm) || 
-                   displayName.includes(searchTerm) ||
-                   email.includes(searchTerm);
-          });
+        const usersSnapshot = await getDocs(usersQuery);
+
+        const newResults = usersSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          // Ensure all required fields are present with defaults
+          return {
+            id: doc.id,
+            userId: doc.id,
+            username: data.username || "",
+            email: data.email || "",
+            photoURL: data.photoURL || "",
+            displayName: data.displayName || data.username || "",
+            usernameLower: (data.username || "").toLowerCase(),
+            displayNameLower: (
+              data.displayName ||
+              data.username ||
+              ""
+            ).toLowerCase(),
+            onboardingComplete: data.onboardingComplete || false,
+            categories: data.categories || {},
+            activeTasks: data.activeTasks || [],
+            userGeneratedTasks: data.userGeneratedTasks || [],
+            Challenges: data.Challenges || [],
+            completedTasks: data.completedTasks || [],
+            overall: data.overall || { level: 1, xp: 0, prestige: 0 },
+            stats: data.stats || {
+              totalTasksCompleted: 0,
+              currentStreak: 0,
+              longestStreak: 0,
+              routinesCompleted: 0,
+              habitsCompleted: [],
+              challengesCompleted: [],
+              totalChallengesJoined: 0,
+              badgesEarned: [],
+              todayXP: 0,
+              todayCompletedTasks: [],
+              lastXPReset: Timestamp.now(),
+              routineStreaks: {},
+              habitStreaks: {},
+            },
+            progress: data.progress || [],
+            challenges: data.challenges || [],
+            subscription: data.subscription || {
+              type: "FREE",
+              startDate: Timestamp.now(),
+              status: "active",
+              autoRenew: false,
+            },
+            habits: data.habits || {},
+            posts: data.posts || [],
+            ...data, // Include any additional fields
+          } as UserData;
+        });
 
         setResults(newResults);
-        setHasMore(false); // Disable pagination for client-side filtering
+        setHasMore(usersSnapshot.docs.length === resultLimit);
+        setLastDoc(usersSnapshot.docs[usersSnapshot.docs.length - 1]);
       } else if (type === "posts") {
         // For posts, we need to handle privacy
         const queries = [
@@ -133,7 +175,7 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
             where("privacy", "==", "public"),
             orderBy("createdAt", "desc"),
             limit(resultLimit)
-          )
+          ),
         ];
 
         // If user is authenticated, add their private posts and friends-only posts
@@ -155,7 +197,11 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
             queries.push(
               query(
                 collection(db, "posts"),
-                where("userId", "in", friends.map((friend: Friend) => friend.userId)),
+                where(
+                  "userId",
+                  "in",
+                  friends.map((friend: Friend) => friend.userId)
+                ),
                 where("privacy", "in", ["public", "friends"]),
                 orderBy("createdAt", "desc"),
                 limit(resultLimit)
@@ -165,27 +211,32 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
         }
 
         // Execute all queries
-        const snapshots = await Promise.all(queries.map(q => getDocs(q)));
-        
+        const snapshots = await Promise.all(queries.map((q) => getDocs(q)));
+
         // Combine and filter results
-        const allPosts = snapshots.flatMap(snapshot =>
-          snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          } as Post))
+        const allPosts = snapshots.flatMap((snapshot) =>
+          snapshot.docs.map(
+            (doc) =>
+              ({
+                id: doc.id,
+                ...doc.data(),
+              } as Post)
+          )
         );
 
         // Remove duplicates and filter by search term
         const uniquePosts = Array.from(
-          new Map(allPosts.map(post => [post.id, post])).values()
+          new Map(allPosts.map((post) => [post.id, post])).values()
         ).filter((post: Post) => {
           const title = (post.title || "").toLowerCase();
           const description = (post.description || "").toLowerCase();
           const hashtags = (post.hashtags || []).join(" ").toLowerCase();
-          
-          return title.includes(searchTerm) || 
-                 description.includes(searchTerm) || 
-                 hashtags.includes(searchTerm);
+
+          return (
+            title.includes(searchTerm) ||
+            description.includes(searchTerm) ||
+            hashtags.includes(searchTerm)
+          );
         });
 
         // Sort by date and limit results
@@ -209,14 +260,16 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
 
         const querySnapshot = await getDocs(baseQuery);
         const newResults = querySnapshot.docs
-          .map(doc => ({
+          .map((doc) => ({
             id: doc.id,
             ...doc.data(),
           }))
-          .filter(item => {
+          .filter((item) => {
             const fields = searchFields[type];
-            return fields.some(field => 
-              String(item[field as keyof typeof item])?.toLowerCase().includes(searchTerm)
+            return fields.some((field) =>
+              String(item[field as keyof typeof item])
+                ?.toLowerCase()
+                .includes(searchTerm)
             );
           });
 
@@ -225,7 +278,8 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
         setHasMore(querySnapshot.docs.length === resultLimit);
       }
     } catch (error) {
-      setError("An error occurred while searching. Please try again.");
+      console.error("Search error:", error);
+      setError("Failed to perform search. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -235,13 +289,18 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
     switch (type) {
       case "users":
         return (
-          <TouchableOpacity 
-            style={[styles.userItem, { backgroundColor: colors.surfaceContainerHigh }]}
+          <TouchableOpacity
+            style={[
+              styles.userItem,
+              { backgroundColor: colors.surfaceContainerHigh },
+            ]}
             onPress={() => router.push(`/(profile)/${item.id}`)}
           >
             <View style={styles.userInfo}>
-              <Image 
-                source={{ uri: item.photoURL || "https://via.placeholder.com/40" }}
+              <Image
+                source={{
+                  uri: item.photoURL || "https://via.placeholder.com/40",
+                }}
                 style={styles.userAvatar}
               />
               <View style={styles.userTextInfo}>
@@ -249,8 +308,8 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
                   {item.username || item.displayName || "Anonymous"}
                 </Text>
                 {item.bio && (
-                  <Text 
-                    style={[styles.userBio, { color: colors.textSecondary }]} 
+                  <Text
+                    style={[styles.userBio, { color: colors.textSecondary }]}
                     numberOfLines={2}
                   >
                     {item.bio}
@@ -261,7 +320,9 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
             {user && item.id !== user.uid && (
               <AddFriendBtn
                 targetUserId={item.id}
-                targetUserDisplayName={item.username || item.displayName || "Anonymous"}
+                targetUserDisplayName={
+                  item.username || item.displayName || "Anonymous"
+                }
                 targetUserPhotoURL={item.photoURL}
                 variant="small"
               />
@@ -271,13 +332,22 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
 
       case "posts":
         return (
-          <View style={[styles.postItem, { backgroundColor: colors.surfaceContainerHigh }]}>
+          <View
+            style={[
+              styles.postItem,
+              { backgroundColor: colors.surfaceContainerHigh },
+            ]}
+          >
             <View style={styles.postHeader}>
-              <Image 
-                source={{ uri: item.userPhotoURL || "https://via.placeholder.com/40" }}
+              <Image
+                source={{
+                  uri: item.userPhotoURL || "https://via.placeholder.com/40",
+                }}
                 style={styles.postAvatar}
               />
-              <Text style={[styles.postUsername, { color: colors.textPrimary }]}>
+              <Text
+                style={[styles.postUsername, { color: colors.textPrimary }]}
+              >
                 {item.username}
               </Text>
             </View>
@@ -289,7 +359,7 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
             )}
 
             {item.imageURL && (
-              <Image 
+              <Image
                 source={{ uri: item.imageURL }}
                 style={styles.postImage}
                 resizeMode="cover"
@@ -297,7 +367,7 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
             )}
 
             {item.description && (
-              <Text 
+              <Text
                 style={[styles.postDescription, { color: colors.textPrimary }]}
                 numberOfLines={2}
               >
@@ -305,33 +375,46 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
               </Text>
             )}
 
-            <View style={[styles.postFooter, { 
-              borderTopColor: colors.border,
-              borderTopWidth: StyleSheet.hairlineWidth,
-              marginTop: 12,
-              paddingTop: 12,
-            }]}>
+            <View
+              style={[
+                styles.postFooter,
+                {
+                  borderTopColor: colors.border,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  marginTop: 12,
+                  paddingTop: 12,
+                },
+              ]}
+            >
               <View style={styles.actionGroup}>
                 <TouchableOpacity style={styles.actionButton}>
-                  <FontAwesome5 
-                    name="heart" 
-                    solid={item.likedBy?.includes(user?.uid || '')}
-                    size={20} 
-                    color={item.likedBy?.includes(user?.uid || '') ? colors.error : colors.textSecondary} 
+                  <FontAwesome5
+                    name="heart"
+                    solid={item.likedBy?.includes(user?.uid || "")}
+                    size={20}
+                    color={
+                      item.likedBy?.includes(user?.uid || "")
+                        ? colors.error
+                        : colors.textSecondary
+                    }
                   />
-                  <Text style={[styles.actionText, { color: colors.textSecondary }]}>
+                  <Text
+                    style={[styles.actionText, { color: colors.textSecondary }]}
+                  >
                     {item.likedBy?.length || 0}
                   </Text>
                 </TouchableOpacity>
               </View>
 
               <TouchableOpacity style={styles.actionButton}>
-                <FontAwesome5 
-                  name="comment" 
-                  size={20} 
-                  color={colors.textSecondary} 
+                <FontAwesome5
+                  name="comment"
+                  size={20}
+                  color={colors.textSecondary}
                 />
-                <Text style={[styles.actionText, { color: colors.textSecondary }]}>
+                <Text
+                  style={[styles.actionText, { color: colors.textSecondary }]}
+                >
                   {item.comments?.length || 0}
                 </Text>
               </TouchableOpacity>
@@ -340,8 +423,8 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
             {item.hashtags?.length > 0 && (
               <View style={styles.hashtagContainer}>
                 {item.hashtags.map((tag: string, index: number) => (
-                  <Text 
-                    key={index} 
+                  <Text
+                    key={index}
                     style={[styles.hashtag, { color: colors.secondary }]}
                   >
                     {tag}
@@ -354,7 +437,12 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
 
       default:
         return (
-          <TouchableOpacity style={[styles.item, { backgroundColor: colors.surfaceContainerHigh }]}>
+          <TouchableOpacity
+            style={[
+              styles.item,
+              { backgroundColor: colors.surfaceContainerHigh },
+            ]}
+          >
             <Text style={styles.itemTitle}>{item.title}</Text>
             {item.description && (
               <Text numberOfLines={2} style={styles.itemDescription}>
@@ -375,25 +463,24 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
   const searchContainerStyle = [
     styles.searchContainer,
     { backgroundColor: colors.surfaceContainerLow, borderColor: colors.border },
-    searchQuery.length > 0 && styles.searchContainerActive
+    searchQuery.length > 0 && styles.searchContainerActive,
   ];
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
     setLastDoc(null); // Reset pagination
-    handleSearch()
-      .finally(() => {
-        setRefreshing(false);
-      });
+    handleSearch().finally(() => {
+      setRefreshing(false);
+    });
   }, [searchQuery, type]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={searchContainerStyle}>
-        <FontAwesome5 
-          name="search" 
-          size={16} 
-          color={colors.labelSecondary} 
+        <FontAwesome5
+          name="search"
+          size={16}
+          color={colors.labelSecondary}
           style={styles.searchIcon}
         />
         <TextInput
@@ -408,7 +495,11 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
         />
         {searchQuery ? (
           <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-            <FontAwesome5 name="times-circle" size={16} color={colors.labelSecondary} />
+            <FontAwesome5
+              name="times-circle"
+              size={16}
+              color={colors.labelSecondary}
+            />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -417,11 +508,7 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
         <ActivityIndicator style={styles.loader} color={colors.secondary} />
       )}
 
-      {error && (
-        <Text style={styles.errorText}>
-          {error}
-        </Text>
-      )}
+      {error && <Text style={styles.errorText}>{error}</Text>}
 
       <FlatList
         data={results}
@@ -439,7 +526,7 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
         }
         contentContainerStyle={[
           styles.listContent,
-          { backgroundColor: colors.background }
+          { backgroundColor: colors.background },
         ]}
         style={{ backgroundColor: colors.background }}
         ListEmptyComponent={
@@ -464,8 +551,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
     borderRadius: 12,
     marginHorizontal: 16,
@@ -552,8 +639,8 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   errorText: {
-    color: 'red',
-    textAlign: 'center',
+    color: "red",
+    textAlign: "center",
     marginTop: 20,
   },
   postItem: {
@@ -567,8 +654,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
   },
   postAvatar: {
@@ -579,15 +666,15 @@ const styles = StyleSheet.create({
   },
   postUsername: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   postTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 8,
   },
   postImage: {
-    width: '100%',
+    width: "100%",
     height: 200,
     borderRadius: 8,
     marginVertical: 8,
@@ -597,32 +684,32 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   postFooter: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 16,
   },
   actionGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   actionText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   hashtagContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginTop: 8,
   },
   hashtag: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   listContent: {
     padding: 16,

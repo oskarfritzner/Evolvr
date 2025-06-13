@@ -48,17 +48,11 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearRoutine = () => {
-    if (
-      currentRoutine.name !== "" ||
-      currentRoutine.description !== "" ||
-      currentRoutine.tasks.length > 0
-    ) {
-      setCurrentRoutine({
-        name: "",
-        description: "",
-        tasks: [],
-      });
-    }
+    setCurrentRoutine({
+      name: "",
+      description: "",
+      tasks: [],
+    });
   };
 
   const value = {

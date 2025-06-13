@@ -33,13 +33,15 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onRoutineCreated?: (routine: Routine) => void;
+  routine: Routine;
+  onRoutineUpdated?: (routine: Routine) => void;
 }
 
-const CreateRoutine: React.FC<Props> = ({
+const EditRoutine: React.FC<Props> = ({
   visible,
   onClose,
-  onRoutineCreated,
+  routine,
+  onRoutineUpdated,
 }) => {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -51,28 +53,34 @@ const CreateRoutine: React.FC<Props> = ({
     clearRoutine,
   } = useRoutine();
 
-  const { createRoutine, isCreating } = useRoutines(user?.uid);
+  const { updateRoutine, isUpdating } = useRoutines(user?.uid);
   const { data: friends = [] } = useFriends(user?.uid);
   const queryClient = useQueryClient();
 
+  const [selectedTask, setSelectedTask] = useState<Partial<RoutineTask> | null>(
+    null
+  );
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedFriends, setSelectedFriends] = useState<FriendData[]>([]);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
   // Initialize routine state when modal opens
   useEffect(() => {
-    if (visible) {
+    if (visible && routine) {
+      updateRoutineName(routine.title);
+      updateRoutineDescription(routine.description || "");
+      if (routine.tasks && routine.tasks.length > 0) {
+        updateRoutineTasks(routine.tasks);
+      }
+    } else {
       clearRoutine();
     }
-    return () => {
-      clearRoutine();
-    };
-  }, [visible]);
+  }, [visible, routine?.id]);
 
   const handleNameChange = (text: string) => {
     updateRoutineName(text);
@@ -102,11 +110,11 @@ const CreateRoutine: React.FC<Props> = ({
         description: task.description || "",
         days: [0, 1, 2, 3, 4, 5, 6],
         completed: false,
-        routineId: generateId(),
-        routineName: currentRoutine.name || "New Routine",
+        routineId: routine.id,
+        routineName: currentRoutine.name || routine.title,
         frequency: "weekly",
         order: currentRoutine.tasks.length,
-        participants: [user?.uid || ""],
+        participants: routine.participants,
         createdAt: Timestamp.now(),
         createdBy: user?.uid || "",
         categories: task.categories || [],
@@ -127,7 +135,14 @@ const CreateRoutine: React.FC<Props> = ({
         text2: "The task was added to your routine.",
       });
     },
-    [user?.uid, currentRoutine.name, currentRoutine.tasks, updateRoutineTasks]
+    [
+      routine.id,
+      routine.participants,
+      user?.uid,
+      currentRoutine.name,
+      currentRoutine.tasks,
+      updateRoutineTasks,
+    ]
   );
 
   const handleRemoveTask = useCallback(
@@ -197,50 +212,50 @@ const CreateRoutine: React.FC<Props> = ({
 
     setIsLoading(true);
     try {
-      const routineId = generateId();
       const formattedTasks = currentRoutine.tasks.map((task) => ({
         ...task,
         id: task.id || generateId(),
         title: task.title,
         active: true,
         days: task.days || [],
-        participants: [user?.uid || ""],
+        participants: routine.participants,
         completions: task.completions || {},
-        routineId,
+        routineId: routine.id,
         routineName: currentRoutine.name.trim(),
         description: task.description || "",
         categoryXp: task.categoryXp || {},
-        createdAt: Timestamp.now(),
+        createdAt: task.createdAt || Timestamp.now(),
         createdBy: user?.uid || "",
+        frequency: task.frequency || "weekly",
+        order: task.order || currentRoutine.tasks.indexOf(task),
+        categories: task.categories || [],
+        tags: task.tags || [],
+        status: task.status || "ACTIVE",
       }));
 
-      const routineData: Routine = {
-        id: routineId,
+      const routineData: Partial<Routine> = {
         title: currentRoutine.name.trim(),
-        description: currentRoutine.description?.trim() || "",
+        description: currentRoutine.description?.trim(),
         tasks: formattedTasks,
-        participants: [user?.uid || ""],
-        invites: selectedFriends.map((f) => f.userId),
-        createdBy: user?.uid || "",
-        createdAt: Timestamp.now().toMillis(),
+        participants: [
+          user?.uid || "",
+          ...selectedFriends.map((f) => f.userId),
+        ],
         active: true,
-        metadata: {
-          currentStreak: 0,
-          bestStreak: 0,
-          totalCompletions: 0,
-          lastCompleted: null,
-          missedTasks: 0,
-          lastChecked: Timestamp.now(),
-        },
+        invites: selectedFriends.map((f) => f.userId),
+        metadata: routine.metadata,
       };
 
-      const result = await createRoutine(routineData);
+      const result = await updateRoutine({
+        routineId: routine.id,
+        updates: routineData,
+      });
 
       queryClient.invalidateQueries({ queryKey: ["routines", user?.uid] });
-      if (onRoutineCreated && result) onRoutineCreated(result);
+      if (onRoutineUpdated && result) onRoutineUpdated(result);
       onClose();
     } catch (error) {
-      setErrorMessage("Failed to create routine");
+      setErrorMessage("Failed to update routine");
     } finally {
       setIsLoading(false);
     }
@@ -315,7 +330,7 @@ const CreateRoutine: React.FC<Props> = ({
           >
             <View style={styles.titleContainer}>
               <Text style={[styles.title, { color: colors.secondary }]}>
-                Create Routine
+                Edit Routine
               </Text>
               <TouchableOpacity
                 onPress={() => setShowInfo(true)}
@@ -466,16 +481,16 @@ const CreateRoutine: React.FC<Props> = ({
             <Button
               mode="contained"
               onPress={handleSubmit}
-              loading={isCreating}
+              loading={isUpdating}
               disabled={
                 !currentRoutine.name?.trim() ||
                 currentRoutine.tasks.length === 0 ||
-                isCreating
+                isUpdating
               }
               style={[styles.button, { backgroundColor: colors.secondary }]}
               textColor={colors.surface}
             >
-              {isCreating ? "Creating..." : "Create Routine"}
+              {isUpdating ? "Saving..." : "Save Changes"}
             </Button>
           </View>
         </View>
@@ -705,4 +720,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CreateRoutine;
+export default EditRoutine;
