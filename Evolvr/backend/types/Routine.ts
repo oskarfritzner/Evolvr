@@ -20,7 +20,6 @@ export interface RoutineTask extends Task {
     }>;
   };
   createdAt: Timestamp;
-  streak?: number;
   active?: boolean;
 }
 
@@ -42,6 +41,8 @@ export interface Routine {
     bestStreak: number;
     lastCompleted: Timestamp | null;
     totalCompletions: number;
+    missedTasks?: number;
+    lastChecked?: Timestamp;
     isFavorite?: boolean;
     personalNotes?: string;
   };
@@ -64,7 +65,6 @@ export interface RoutineTaskWithMeta {
   description: string;
   createdBy: string;
   type?: "routine";
-  streak: number;
   lastCompleted: Timestamp | null;
   completions?: {
     [date: string]: Array<{

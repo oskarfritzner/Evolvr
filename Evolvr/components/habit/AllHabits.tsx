@@ -25,7 +25,7 @@ export default function AllHabits({ compact = false }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
   const queryClient = useQueryClient();
 
-  const { habits, isLoading, createHabit, refetchHabits } = useHabits(
+  const { habits, isLoading, createHabit, refetchHabits, userData } = useHabits(
     user?.uid
   );
 
@@ -74,7 +74,11 @@ export default function AllHabits({ compact = false }: Props) {
             </Text>
           </TouchableOpacity>
         ) : (
-          <HabitGrid habits={habits} onRefresh={refetchHabits} />
+          <HabitGrid
+            habits={habits}
+            onRefresh={refetchHabits}
+            missedHabits={userData?.missedHabits || []}
+          />
         )}
       </View>
 

@@ -1,49 +1,56 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity } from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
-import { useAuth } from '@/context/AuthContext';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, IconButton, Surface } from 'react-native-paper';
-import { Stack, router } from 'expo-router';
-import { Goal, GoalTimeframe } from '@/backend/types/Goal';
-import { goalService } from '@/backend/services/goalService';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { GoalModal } from '@/components/goals/GoalModal';
-import GoalSection from '@/components/goals/GoalSection';
-import { FontAwesome5 } from '@expo/vector-icons';
+import React, { useState, useMemo, useCallback } from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+} from "react-native";
+import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Button, IconButton, Surface } from "react-native-paper";
+import { Stack, router } from "expo-router";
+import { Goal, GoalTimeframe } from "@/backend/types/Goal";
+import { goalService } from "@/backend/services/goalService";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { GoalModal } from "@/components/goals/GoalModal";
+import GoalSection from "@/components/goals/GoalSection";
+import { FontAwesome5 } from "@expo/vector-icons";
 
 export default function GoalsPage() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [expandedSections, setExpandedSections] = useState({
-    monthly: false,
-    yearly: false
-  });
+  const { width } = useWindowDimensions();
+  const isLargeScreen = width >= 1024;
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedTimeframe, setSelectedTimeframe] = useState<GoalTimeframe>(GoalTimeframe.DAILY);
+  const [selectedTimeframe, setSelectedTimeframe] = useState<GoalTimeframe>(
+    GoalTimeframe.DAILY
+  );
   const [selectedGoal, setSelectedGoal] = useState<Goal | undefined>(undefined);
 
   // Fetch all goals in a single query
   const { data: allGoals, isLoading } = useQuery({
-    queryKey: ['goals', user?.uid],
+    queryKey: ["goals", user?.uid],
     queryFn: async () => {
       if (!user?.uid) return null;
-      
+
       // Fetch all goals in parallel
       const [daily, monthly, yearly] = await Promise.all([
         goalService.getGoalsByTimeframe(user.uid, GoalTimeframe.DAILY),
         goalService.getGoalsByTimeframe(user.uid, GoalTimeframe.MONTHLY),
-        goalService.getGoalsByTimeframe(user.uid, GoalTimeframe.YEARLY)
+        goalService.getGoalsByTimeframe(user.uid, GoalTimeframe.YEARLY),
       ]);
 
       return {
         daily,
         monthly,
-        yearly
+        yearly,
       };
     },
     enabled: !!user?.uid,
@@ -52,11 +59,14 @@ export default function GoalsPage() {
   });
 
   // Memoize sorted goals
-  const { dailyGoals, monthlyGoals, yearlyGoals } = useMemo(() => ({
-    dailyGoals: allGoals?.daily || [],
-    monthlyGoals: allGoals?.monthly || [],
-    yearlyGoals: allGoals?.yearly || []
-  }), [allGoals]);
+  const { dailyGoals, monthlyGoals, yearlyGoals } = useMemo(
+    () => ({
+      dailyGoals: allGoals?.daily || [],
+      monthlyGoals: allGoals?.monthly || [],
+      yearlyGoals: allGoals?.yearly || [],
+    }),
+    [allGoals]
+  );
 
   // Memoize handlers
   const handleEditGoal = useCallback((goal: Goal) => {
@@ -70,59 +80,46 @@ export default function GoalsPage() {
     setSelectedGoal(undefined);
   }, []);
 
-  const toggleMonthlySection = useCallback(() => {
-    setExpandedSections(prev => ({ 
-      ...prev, 
-      monthly: !prev.monthly 
-    }));
-  }, []);
-
-  const toggleYearlySection = useCallback(() => {
-    setExpandedSections(prev => ({ 
-      ...prev, 
-      yearly: !prev.yearly 
-    }));
-  }, []);
-
-  // Prefetch data for other timeframes when they're about to be expanded
-  const handlePrefetch = useCallback(async (timeframe: GoalTimeframe) => {
-    if (!user?.uid) return;
-    
-    await queryClient.prefetchQuery({
-      queryKey: ['goals', user.uid, timeframe],
-      queryFn: () => goalService.getGoalsByTimeframe(user.uid, timeframe),
-      staleTime: 30000,
-    });
-  }, [user?.uid, queryClient]);
-
   if (isLoading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: colors.background },
+        ]}
+      >
         <LoadingSpinner />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={["top"]}
+    >
       <Stack.Screen
         options={{
           headerTitle: "Goals",
-          headerTitleStyle: { 
+          headerTitleStyle: {
             color: colors.textPrimary,
             fontSize: 24,
-            fontWeight: '700',
+            fontWeight: "700",
           },
-          headerStyle: { 
-            backgroundColor: colors.background 
+          headerStyle: {
+            backgroundColor: colors.background,
           },
           headerShadowVisible: false,
           headerLeft: () => (
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => router.back()}
               style={[styles.headerButton, { backgroundColor: colors.surface }]}
             >
-              <FontAwesome5 name="arrow-left" size={16} color={colors.textSecondary} />
+              <FontAwesome5
+                name="arrow-left"
+                size={16}
+                color={colors.textSecondary}
+              />
             </TouchableOpacity>
           ),
         }}
@@ -134,46 +131,42 @@ export default function GoalsPage() {
         </Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isLargeScreen && styles.scrollContentLarge,
+        ]}
         removeClippedSubviews={true}
       >
-        <GoalSection
-          title="Daily Goals"
-          goals={dailyGoals}
-          timeframe={GoalTimeframe.DAILY}
-          onEditGoal={handleEditGoal}
-        />
+        <View
+          style={[
+            styles.goalsContainer,
+            isLargeScreen && styles.goalsContainerLarge,
+          ]}
+        >
+          <GoalSection
+            title="Daily Goals"
+            goals={dailyGoals}
+            timeframe={GoalTimeframe.DAILY}
+            onEditGoal={handleEditGoal}
+          />
 
-        <GoalSection
-          title="Monthly Goals"
-          goals={monthlyGoals}
-          timeframe={GoalTimeframe.MONTHLY}
-          isExpanded={expandedSections.monthly}
-          onToggleExpand={() => {
-            toggleMonthlySection();
-            if (!expandedSections.monthly) {
-              handlePrefetch(GoalTimeframe.MONTHLY);
-            }
-          }}
-          onEditGoal={handleEditGoal}
-        />
+          <GoalSection
+            title="Monthly Goals"
+            goals={monthlyGoals}
+            timeframe={GoalTimeframe.MONTHLY}
+            onEditGoal={handleEditGoal}
+          />
 
-        <GoalSection
-          title="Yearly Goals"
-          goals={yearlyGoals}
-          timeframe={GoalTimeframe.YEARLY}
-          isExpanded={expandedSections.yearly}
-          onToggleExpand={() => {
-            toggleYearlySection();
-            if (!expandedSections.yearly) {
-              handlePrefetch(GoalTimeframe.YEARLY);
-            }
-          }}
-          onEditGoal={handleEditGoal}
-        />
+          <GoalSection
+            title="Yearly Goals"
+            goals={yearlyGoals}
+            timeframe={GoalTimeframe.YEARLY}
+            onEditGoal={handleEditGoal}
+          />
+        </View>
       </ScrollView>
 
       <GoalModal
@@ -192,8 +185,8 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   header: {
     paddingHorizontal: 20,
@@ -201,7 +194,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    fontWeight: '400',
+    fontWeight: "400",
     letterSpacing: 0.15,
     opacity: 0.8,
   },
@@ -212,9 +205,21 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 8,
   },
+  scrollContentLarge: {
+    padding: 24,
+    paddingTop: 12,
+  },
+  goalsContainer: {
+    flex: 1,
+  },
+  goalsContainerLarge: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 24,
+  },
   headerButton: {
     padding: 12,
     borderRadius: 24,
     marginLeft: 16,
   },
-}); 
+});

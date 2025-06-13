@@ -99,6 +99,108 @@ const CreateRoutine: React.FC<Props> = ({
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
+  // 1. Local draft state for routine editing
+  const [draftRoutine, setDraftRoutine] = useState<Partial<Routine>>({
+    title: "",
+    description: "",
+    tasks: [],
+  });
+
+  // Derived value for tasks (always an array)
+  const tasks: RoutineTask[] = (draftRoutine.tasks as RoutineTask[]) || [];
+
+  // 2. Initialize draftRoutine from props.routine when modal opens
+  useEffect(() => {
+    if (visible) {
+      if (routine) {
+        setDraftRoutine({
+          ...routine,
+          title: routine.title,
+          description: routine.description || "",
+          tasks: routine.tasks ? [...routine.tasks] : [],
+        });
+      } else {
+        setDraftRoutine({ title: "", description: "", tasks: [] });
+      }
+    } else {
+      setDraftRoutine({ title: "", description: "", tasks: [] });
+    }
+  }, [visible, routine?.id]);
+
+  // 3. Handlers for local draft changes
+  const handleNameChange = (text: string) => {
+    setDraftRoutine((prev) => ({ ...prev, title: text }));
+  };
+
+  const handleDescriptionChange = (text: string) => {
+    setDraftRoutine((prev) => ({ ...prev, description: text }));
+  };
+
+  const handleTaskAdded = useCallback(
+    (task?: Task) => {
+      if (!task) return;
+      setDraftRoutine((prev) => {
+        const existingTasks = (prev.tasks as RoutineTask[]) || [];
+        // Prevent duplicate task IDs
+        if (existingTasks.some((t) => t.id === task.id)) {
+          Toast.show({
+            type: "error",
+            text1: "Task already added",
+            text2: "You cannot add the same task twice to a routine.",
+          });
+          return prev;
+        }
+        return {
+          ...prev,
+          tasks: [
+            ...existingTasks,
+            {
+              ...task,
+              id: task.id || generateId(),
+              title: task.title,
+              description: task.description || "",
+              days: [0, 1, 2, 3, 4, 5, 6],
+              completed: false,
+              routineId: routine?.id || generateId(),
+              routineName: prev.title || "New Routine",
+              frequency: "weekly",
+              order: existingTasks.length,
+              participants: routine?.participants || [user?.uid || ""],
+              createdAt: Timestamp.now(),
+              createdBy: user?.uid || "",
+              categories: task.categories || [],
+              categoryXp: task.categoryXp || {},
+              tags: task.tags || [],
+              status: task.status,
+              active: true,
+              completions: {},
+            },
+          ],
+        };
+      });
+      setShowAddTask(false);
+    },
+    [routine?.id, routine?.participants, user?.uid]
+  );
+
+  const handleRemoveTask = useCallback((taskId: string) => {
+    setDraftRoutine((prev) => {
+      const newTasks = ((prev.tasks as RoutineTask[]) || []).filter(
+        (task) => task.id !== taskId
+      );
+      // Show feedback
+      Toast.show({
+        type: "success",
+        text1: "Task removed",
+        text2: "The task was removed from your routine.",
+      });
+      return {
+        ...prev,
+        tasks: newTasks,
+      };
+    });
+  }, []);
+
   // 6. Effect hooks
   useEffect(() => {
     const loadRoutine = async () => {
@@ -130,7 +232,6 @@ const CreateRoutine: React.FC<Props> = ({
   // Single effect to handle modal visibility changes
   useEffect(() => {
     if (!visible) {
-      // Reset all state when modal is closed
       setSelectedTask(null);
       setValidationMessage("");
       setShowInfo(false);
@@ -177,6 +278,11 @@ const CreateRoutine: React.FC<Props> = ({
       ]).start();
     }
   }, [errorMessage, errorAnim]);
+
+  // Add effect to track currentRoutine changes
+  useEffect(() => {
+    console.log("CreateRoutine - currentRoutine updated:", currentRoutine);
+  }, [currentRoutine]);
 
   // 7. Handlers
   const showSuccessMessage = useCallback((message: string) => {
@@ -246,14 +352,6 @@ const CreateRoutine: React.FC<Props> = ({
     updateRoutineTasks(updatedTasks);
   };
 
-  const handleNameChange = (text: string) => {
-    updateRoutineName(text);
-  };
-
-  const handleDescriptionChange = (text: string) => {
-    updateRoutineDescription(text);
-  };
-
   const handleSetAll = (taskId: string) => {
     const updatedTasks = currentRoutine.tasks.map((task) => {
       if (task.id === taskId) {
@@ -268,16 +366,6 @@ const CreateRoutine: React.FC<Props> = ({
     updateRoutineTasks(updatedTasks);
   };
 
-  const handleRemoveTask = useCallback(
-    (taskId: string) => {
-      const updatedTasks = currentRoutine.tasks.filter(
-        (task) => task.id !== taskId
-      );
-      updateRoutineTasks(updatedTasks);
-    },
-    [currentRoutine.tasks, updateRoutineTasks]
-  );
-
   const handleFriendSelect = useCallback(
     (selectedIds: string[]) => {
       const selectedFriendData = friends.filter((friend) =>
@@ -288,137 +376,59 @@ const CreateRoutine: React.FC<Props> = ({
     [friends]
   );
 
-  const handleTaskAdded = useCallback(
-    (task?: Task) => {
-      console.log("CreateRoutine - handleTaskAdded called with task:", task);
-      if (!task) {
-        console.log("CreateRoutine - No task provided, returning");
-        return;
-      }
-
-      // Create a complete RoutineTask with all required properties
-      const newTask: RoutineTask = {
-        ...task,
-        id: task.id || generateId(),
-        days: [0, 1, 2, 3, 4, 5, 6], // Default to all days selected
-        completed: false,
-        routineId: routine?.id || "",
-        routineName: currentRoutine.name || "",
-        frequency: "weekly",
-        order: currentRoutine.tasks.length,
-        participants: routine?.participants || [user?.uid || ""],
-        createdAt: Timestamp.now(),
-        createdBy: user?.uid || "",
-        categories: task.categories || [],
-        categoryXp: task.categoryXp || {},
-        tags: task.tags || [],
-        status: task.status,
-      };
-
-      console.log("CreateRoutine - Created new routine task:", newTask);
-      console.log(
-        "CreateRoutine - Current routine tasks:",
-        currentRoutine.tasks
-      );
-
-      // Add the task to the routine using the context function
-      console.log("CreateRoutine - Calling addTaskToRoutine");
-      addTaskToRoutine(newTask);
-      console.log("CreateRoutine - addTaskToRoutine completed");
-
-      // Close the add task modal
-      console.log("CreateRoutine - Closing AddTask modal");
-      setShowAddTask(false);
-    },
-    [
-      currentRoutine.tasks,
-      currentRoutine.name,
-      routine?.id,
-      routine?.participants,
-      user?.uid,
-      addTaskToRoutine,
-    ]
-  );
-
+  // 4. Save handler: only update backend here
   const handleSubmit = async () => {
-    // Validate the form
-    if (!currentRoutine.name.trim()) {
-      setValidationMessage("Please enter a title for your routine");
+    if (!draftRoutine.title?.trim()) {
+      setErrorMessage("Please enter a title for your routine");
       return;
     }
-
-    // Check if each task has at least one day selected
-    const hasInvalidTask = currentRoutine.tasks.some(
-      (task) => task.days.length === 0
-    );
-    if (hasInvalidTask) {
-      setValidationMessage("Please select at least one day for each task");
+    const tasks = (draftRoutine.tasks as RoutineTask[]) || [];
+    if (tasks.length === 0) {
+      setErrorMessage("Please add at least one task");
       return;
     }
-
-    setValidationMessage("");
+    if (tasks.some((task) => !task.days || task.days.length === 0)) {
+      setErrorMessage("Please select at least one day for each task");
+      return;
+    }
     setIsLoading(true);
-
     try {
       const routineData: Partial<Routine> = {
-        title: currentRoutine.name.trim(),
-        description: currentRoutine.description.trim(),
-        tasks: currentRoutine.tasks,
-        createdBy: user?.uid || "",
-        createdAt: new Date().getTime(), // Using timestamp as number
-        participants: selectedFriends.map((f) => f.userId),
+        ...draftRoutine,
+        title: draftRoutine.title?.trim(),
+        description: draftRoutine.description?.trim(),
+        tasks,
+        participants: [
+          user?.uid || "",
+          ...selectedFriends.map((f) => f.userId),
+        ],
         active: true,
         invites: selectedFriends.map((f) => f.userId),
+        metadata: routine?.metadata || {
+          currentStreak: 0,
+          bestStreak: 0,
+          totalCompletions: 0,
+          lastCompleted: null,
+          missedTasks: 0,
+          lastChecked: Timestamp.now(),
+        },
       };
-
       let result;
-
-      if (isEditMode && routine?.id) {
-        // Update existing routine
+      if (routine?.id) {
         result = await updateRoutine({
           routineId: routine.id,
           updates: routineData,
         });
-
-        // Show success message
-        showSuccessMessage("Routine updated successfully");
-        Toast.show({
-          type: "success",
-          text1: "Routine updated successfully",
-        });
+        setSuccessMessage("Routine updated successfully");
       } else {
-        // Create new routine
-        routineData.id = generateId();
         result = await createRoutine(routineData as Routine);
-
-        // Show success message
-        showSuccessMessage("Routine created successfully");
-        Toast.show({
-          type: "success",
-          text1: "Routine created successfully",
-        });
+        setSuccessMessage("Routine created successfully");
       }
-
-      // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["routines", user?.uid] });
-
-      // Notify parent component
-      if (onRoutineCreated && result) {
-        onRoutineCreated(result);
-      }
-
-      // Close modal after a brief delay
-      setTimeout(() => {
-        onClose();
-      }, 500);
+      if (onRoutineCreated && result) onRoutineCreated(result);
+      onClose();
     } catch (error) {
-      console.error("Error saving routine:", error);
-      showErrorMessage("Failed to save routine");
-      Toast.show({
-        type: "error",
-        text1: "Error",
-        text2: "Failed to save routine",
-      });
+      setErrorMessage("Failed to save routine");
     } finally {
       setIsLoading(false);
     }
@@ -615,7 +625,7 @@ const CreateRoutine: React.FC<Props> = ({
                     ]}
                     placeholder="Enter routine name"
                     placeholderTextColor={colors.textSecondary}
-                    value={currentRoutine.name}
+                    value={draftRoutine.title}
                     onChangeText={handleNameChange}
                     editable={!isReadOnly}
                   />
@@ -630,7 +640,7 @@ const CreateRoutine: React.FC<Props> = ({
                     ]}
                     placeholder="Describe your routine (optional)"
                     placeholderTextColor={colors.textSecondary}
-                    value={currentRoutine.description}
+                    value={draftRoutine.description}
                     onChangeText={handleDescriptionChange}
                     multiline
                     numberOfLines={4}
@@ -644,7 +654,7 @@ const CreateRoutine: React.FC<Props> = ({
                   Tasks
                 </Text>
                 <View style={styles.inputContainer}>
-                  {currentRoutine.tasks.length === 0 ? (
+                  {tasks.length === 0 ? (
                     <TouchableOpacity
                       style={[
                         styles.emptyState,
@@ -664,7 +674,7 @@ const CreateRoutine: React.FC<Props> = ({
                     </TouchableOpacity>
                   ) : (
                     <View style={styles.taskList}>
-                      {currentRoutine.tasks.map((task) => (
+                      {tasks.map((task: RoutineTask) => (
                         <View
                           key={task.id}
                           style={[
@@ -702,6 +712,32 @@ const CreateRoutine: React.FC<Props> = ({
                           {renderDays(task)}
                         </View>
                       ))}
+
+                      {/* Add Task Button */}
+                      <TouchableOpacity
+                        style={[
+                          styles.addTaskButton,
+                          { borderColor: colors.border },
+                        ]}
+                        onPress={handleAddRoutineTask}
+                        disabled={isReadOnly}
+                      >
+                        <View style={styles.addTaskContent}>
+                          <FontAwesome5
+                            name="plus"
+                            size={16}
+                            color={colors.secondary}
+                          />
+                          <Text
+                            style={[
+                              styles.addTaskText,
+                              { color: colors.secondary },
+                            ]}
+                          >
+                            Add Another Task
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
                     </View>
                   )}
                 </View>
@@ -723,8 +759,8 @@ const CreateRoutine: React.FC<Props> = ({
               onPress={handleSubmit}
               loading={isCreating || isUpdating}
               disabled={
-                !currentRoutine.name.trim() ||
-                currentRoutine.tasks.length === 0 ||
+                !draftRoutine.title?.trim() ||
+                tasks.length === 0 ||
                 isCreating ||
                 isUpdating
               }

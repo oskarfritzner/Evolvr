@@ -114,42 +114,38 @@ export const routineService = {
         lastUpdated: Timestamp.now(),
       };
 
-      // If tasks are being updated, merge with existing tasks
+      // If tasks are being updated, replace with the new array (remove deleted tasks)
       if (updates.tasks) {
-        const existingTasks = currentRoutine.tasks || [];
-        const updatedTasks = existingTasks.map((existingTask) => {
-          // Find matching task in updates
-          const updatedTask = updates.tasks?.find(
-            (task) => task.id === existingTask.id
+        updatedData.tasks = updates.tasks.map((newTask) => {
+          const existingTask = (currentRoutine.tasks || []).find(
+            (t) => t.id === newTask.id
           );
-          if (updatedTask) {
-            // Merge existing task with updates, preserving completions
+          if (existingTask) {
             return {
               ...existingTask,
-              ...updatedTask,
+              ...newTask,
               completions: {
-                ...existingTask.completions,
-                ...(updatedTask.completions || {}),
+                ...(existingTask.completions || {}),
+                ...(newTask.completions || {}),
               },
-              participants: existingTask.participants, // Preserve participants
-              active: updatedTask.active ?? existingTask.active ?? true,
+              participants:
+                existingTask.participants || currentRoutine.participants || [],
+              active: newTask.active ?? existingTask.active ?? true,
+            };
+          } else {
+            // New task: ensure all required fields are set
+            return {
+              ...newTask,
+              completions: newTask.completions || {},
+              participants: currentRoutine.participants || [],
+              active: newTask.active ?? true,
+              createdAt: newTask.createdAt || Timestamp.now(),
+              createdBy: newTask.createdBy || currentRoutine.createdBy,
+              routineId: routineId,
+              routineName: updates.title || currentRoutine.title || "",
             };
           }
-          return existingTask; // Keep unchanged tasks
         });
-
-        // Add any new tasks from updates that don't exist in current routine
-        updates.tasks.forEach((newTask) => {
-          if (!existingTasks.find((task) => task.id === newTask.id)) {
-            updatedTasks.push({
-              ...newTask,
-              active: true,
-              participants: currentRoutine.participants || [],
-            });
-          }
-        });
-
-        updatedData.tasks = updatedTasks;
       }
 
       // Preserve participants
@@ -551,28 +547,38 @@ export const routineService = {
       const task = tasksArray[taskIndex];
       const completedAt = Timestamp.now();
 
-      const batch = writeBatch(db);
+      // Create a new completion entry
+      const completion = {
+        completedBy: userId,
+        completedAt,
+      };
 
-      // 1. Update the task's completions in the routine document
-      batch.update(routineRef, {
-        [`tasks.${taskIndex}.completions.${today}`]: arrayUnion({
-          completedBy: userId,
-          completedAt,
-        }),
+      // Create a new tasks array with the updated task
+      const updatedTasks = [...tasksArray];
+      updatedTasks[taskIndex] = {
+        ...task, // Preserve all existing task data
+        completions: {
+          ...task.completions, // Preserve existing completions
+          [today]: task.completions?.[today]
+            ? [...task.completions[today], completion]
+            : [completion],
+        },
+      };
+
+      // Update only the tasks array in the routine document
+      await updateDoc(routineRef, {
+        tasks: updatedTasks,
       });
 
-      // 2. Create completion document in user's completions subcollection
+      // Create completion document in user's completions subcollection
       const completionRef = doc(collection(db, "users", userId, "completions"));
-      batch.set(completionRef, {
+      await setDoc(completionRef, {
         taskId,
         completedAt,
         type: "routine",
         routineId,
         categoryXp: task.categoryXp,
       } as TaskCompletion);
-
-      // 3. Update user's active tasks if needed
-      await batch.commit();
 
       // Award XP for completing the routine task
       await levelService.addXP(userId, task.categoryXp, "routine", task.title);
@@ -663,10 +669,14 @@ export const routineService = {
               )
             );
 
+          // Changed logic: Show task if either:
+          // 1. It's an individual routine and user hasn't completed it
+          // 2. It's a group routine and not all participants have completed it
+          // 3. It's a group routine and user hasn't completed it yet
           const isIndividualRoutine = participants.length === 1;
           const shouldShowTask = isIndividualRoutine
             ? !userHasCompleted
-            : !allCompleted;
+            : !allCompleted || !userHasCompleted;
 
           if (shouldShowTask) {
             try {
@@ -686,7 +696,6 @@ export const routineService = {
                 description: task.description || "",
                 createdBy: routine.createdBy,
                 type: "routine",
-                streak: routine.metadata?.currentStreak || 0,
                 lastCompleted: routine.metadata?.lastCompleted || null,
                 completions: Object.fromEntries(
                   Object.entries(task.completions || {}).map(
@@ -869,7 +878,9 @@ export const routineService = {
       }
 
       const routine = routineDoc.data() as Routine;
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date();
+      const todayStr = today.toISOString().split("T")[0];
+      const currentDayOfWeek = today.getDay();
 
       // Convert tasks to array if it's an object
       const tasksArray = (
@@ -878,40 +889,64 @@ export const routineService = {
           : Object.values(routine.tasks || {})
       ) as RoutineTask[];
 
-      // Get all tasks completions for today
-      const tasksCompletions = tasksArray.map((task) => ({
-        taskId: task.id,
-        completions: task.completions?.[today] || [],
-      }));
-
-      // Check if all tasks are completed by all participants
-      const allTasksCompleted = tasksCompletions.every((task) =>
-        routine.participants.every((participantId) =>
-          task.completions.some(
-            (completion) => completion.completedBy === participantId
-          )
-        )
+      // Filter tasks scheduled for today
+      const todaysTasks = tasksArray.filter(
+        (task) => task.days?.includes(currentDayOfWeek) && task.active !== false
       );
 
-      // Calculate streak
-      let currentStreak = routine.metadata?.currentStreak || 0;
+      if (todaysTasks.length === 0) {
+        // No tasks scheduled for today, preserve current streak
+        return;
+      }
+
+      // Check completions for each task scheduled for today
+      const taskCompletionStatus = todaysTasks.map((task) => {
+        const todayCompletions = task.completions?.[todayStr] || [];
+        const participantCompletions = new Set(
+          todayCompletions.map((c) => c.completedBy)
+        );
+
+        return {
+          taskId: task.id,
+          isCompleted: routine.participants.every((participantId) =>
+            participantCompletions.has(participantId)
+          ),
+        };
+      });
+
+      // Calculate if any tasks were missed
+      const missedTasks = taskCompletionStatus.filter(
+        (t) => !t.isCompleted
+      ).length;
+      const allTasksCompleted = missedTasks === 0;
+
+      // Get the last completion date
       const lastCompleted = routine.metadata?.lastCompleted?.toDate() || null;
+      let currentStreak = routine.metadata?.currentStreak || 0;
 
       if (allTasksCompleted) {
+        // All tasks completed, check if streak should increment
         if (lastCompleted) {
           const oneDayInMs = 24 * 60 * 60 * 1000;
           const daysSinceLastCompleted = Math.round(
-            (new Date().getTime() - lastCompleted.getTime()) / oneDayInMs
+            (today.getTime() - lastCompleted.getTime()) / oneDayInMs
           );
 
           if (daysSinceLastCompleted === 1) {
+            // Consecutive day, increment streak
             currentStreak++;
           } else if (daysSinceLastCompleted > 1) {
+            // More than one day gap, reset streak
             currentStreak = 1;
           }
+          // If same day, keep current streak
         } else {
+          // First completion ever
           currentStreak = 1;
         }
+      } else {
+        // Tasks were missed, reset streak
+        currentStreak = 0;
       }
 
       // Update routine metadata
@@ -927,6 +962,9 @@ export const routineService = {
         "metadata.totalCompletions":
           (routine.metadata?.totalCompletions || 0) +
           (allTasksCompleted ? 1 : 0),
+        "metadata.missedTasks":
+          (routine.metadata?.missedTasks || 0) + missedTasks,
+        "metadata.lastChecked": Timestamp.now(),
       });
     } catch (error) {
       console.error("Error updating routine metadata:", error);

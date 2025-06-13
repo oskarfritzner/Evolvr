@@ -11,8 +11,16 @@ import {
   limit,
 } from "firebase/firestore";
 import { db } from "@/backend/config/firebase";
-import { JournalEntry, DailyJournal, JournalType } from "../types/JournalEntry";
+import {
+  JournalEntry,
+  DailyJournal,
+  JournalType,
+  ReflectionEntry,
+  GratitudeEntry,
+  GoalsEntry,
+} from "../types/JournalEntry";
 import { levelService } from "./levelService";
+import { encryptionService } from "./encryptionService";
 
 // XP constants per type
 const XP_REWARDS = {
@@ -21,62 +29,62 @@ const XP_REWARDS = {
   [JournalType.REFLECTION]: 100,
 };
 
+type JournalContent = GratitudeEntry | GoalsEntry | ReflectionEntry;
+
 export const journalService = {
-  async saveEntry(userId: string, entry: Partial<JournalEntry>): Promise<void> {
+  async saveEntry(
+    userId: string,
+    entry: Omit<JournalEntry, "id" | "userId" | "timestamp" | "xpAwarded">,
+    isEncrypted: boolean = false
+  ): Promise<void> {
     try {
-      const now = new Date();
-      const dateId = now.toISOString().split("T")[0];
-      const timestamp = Timestamp.now();
+      const currentDate = new Date().toISOString().split("T")[0];
+      const journalRef = doc(db, "users", userId, "journals", currentDate);
 
-      // Get or create daily journal document
-      const dailyJournalRef = doc(db, "users", userId, "journals", dateId);
-      const dailyJournalDoc = await getDoc(dailyJournalRef);
+      // Get existing journal or create new one
+      const journalDoc = await getDoc(journalRef);
+      let journalData = journalDoc.exists() ? journalDoc.data() : null;
 
-      const dailyJournal: DailyJournal = dailyJournalDoc.exists()
-        ? (dailyJournalDoc.data() as DailyJournal)
-        : {
-            date: dateId,
-            userId,
-            entries: [],
-            createdAt: timestamp,
-            updatedAt: timestamp,
-            xpAwardedTypes: [],
-          };
+      if (!journalData) {
+        journalData = {
+          date: currentDate,
+          userId,
+          entries: [],
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+          xpAwardedTypes: [],
+        };
+      }
 
-      // Check if XP can be awarded for this type today
-      const canAwardXP = !dailyJournal.xpAwardedTypes.includes(entry.type!);
-
-      const newEntry: JournalEntry = {
-        id: timestamp.toDate().getTime().toString(),
+      // Prepare the entry
+      const journalEntry: JournalEntry = {
+        ...entry,
+        id: crypto.randomUUID(),
+        timestamp: Timestamp.now(),
         userId,
-        type: entry.type!,
-        timestamp,
-        content: entry.content!,
-        xpAwarded: canAwardXP,
+        xpAwarded: false,
       };
 
-      // Update daily journal
-      await setDoc(dailyJournalRef, {
-        ...dailyJournal,
-        entries: [...dailyJournal.entries, newEntry],
-        updatedAt: timestamp,
-        xpAwardedTypes: canAwardXP
-          ? [...dailyJournal.xpAwardedTypes, entry.type!]
-          : dailyJournal.xpAwardedTypes,
-      });
-
-      // Award XP if eligible
-      if (canAwardXP) {
-        const xp = XP_REWARDS[entry.type!];
-        const xpGains = {
-          mental: xp * 0.6,
-          intellectual: xp * 0.4,
-        };
-        await levelService.addXP(userId, xpGains, "normal");
+      // Encrypt if needed
+      if (isEncrypted) {
+        const contentString = JSON.stringify(journalEntry.content);
+        const encryptedContent = await encryptionService.encrypt(
+          contentString,
+          userId
+        );
+        journalEntry.content = encryptedContent as unknown as JournalContent;
+        journalEntry.isEncrypted = true;
       }
+
+      // Add to entries array
+      journalData.entries.push(journalEntry);
+      journalData.updatedAt = Timestamp.now();
+
+      // Save to Firestore
+      await setDoc(journalRef, journalData);
     } catch (error) {
       console.error("Error saving journal entry:", error);
-      throw error;
+      throw new Error("Failed to save journal entry");
     }
   },
 
@@ -85,37 +93,101 @@ export const journalService = {
       const dailyJournalRef = doc(db, "users", userId, "journals", date);
       const dailyJournalDoc = await getDoc(dailyJournalRef);
 
-      if (!dailyJournalDoc.exists()) return [];
+      if (!dailyJournalDoc.exists()) {
+        return [];
+      }
 
-      const dailyJournal = dailyJournalDoc.data() as DailyJournal;
-      return dailyJournal.entries;
+      const dailyJournal = dailyJournalDoc.data();
+      const entries = dailyJournal.entries as JournalEntry[];
+
+      // Decrypt entries if they are encrypted
+      const decryptedEntries = await Promise.all(
+        entries.map(async (entry) => {
+          if (entry.isEncrypted) {
+            const key = await encryptionService.getKey(userId);
+            if (key) {
+              const decryptedContent = await encryptionService.decrypt(
+                entry.content as unknown as string,
+                key
+              );
+              return {
+                ...entry,
+                content: JSON.parse(decryptedContent) as JournalContent,
+              };
+            }
+          }
+          return entry;
+        })
+      );
+
+      return decryptedEntries;
     } catch (error) {
       console.error("Error getting daily entries:", error);
-      throw error;
+      throw new Error("Failed to get daily entries");
     }
   },
 
   async getJournalHistory(
     userId: string,
     startDate: string,
-    endDate: string,
-    pageSize: number = 10
+    endDate: string
   ): Promise<DailyJournal[]> {
     try {
-      const journalsRef = collection(db, "users", userId, "journals");
-      const q = query(
-        journalsRef,
-        where("date", ">=", startDate),
-        where("date", "<=", endDate),
-        orderBy("date", "desc"),
-        limit(pageSize)
-      );
+      const dailyJournalsRef = collection(db, "users", userId, "journals");
+      const q = query(dailyJournalsRef, orderBy("date", "desc"));
 
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc) => doc.data() as DailyJournal);
+      const querySnapshot = await getDocs(q);
+      const dailyJournals: DailyJournal[] = [];
+
+      for (const doc of querySnapshot.docs) {
+        const journalDoc = doc.data();
+
+        // Convert the document to DailyJournal format
+        const dailyJournal: DailyJournal = {
+          date: journalDoc.date,
+          userId: journalDoc.userId,
+          entries: journalDoc.entries || [],
+          createdAt: journalDoc.createdAt || Timestamp.now(),
+          updatedAt: journalDoc.updatedAt || Timestamp.now(),
+          xpAwardedTypes: journalDoc.xpAwardedTypes || [],
+        };
+
+        // Decrypt entries if they are encrypted
+        const decryptedEntries = await Promise.all(
+          dailyJournal.entries.map(async (entry) => {
+            if (entry.isEncrypted) {
+              try {
+                const decryptedContent = await encryptionService.decrypt(
+                  entry.content as unknown as string,
+                  userId
+                );
+                return {
+                  ...entry,
+                  content: JSON.parse(decryptedContent) as JournalContent,
+                };
+              } catch (error) {
+                console.error("Error decrypting entry:", error);
+                return entry;
+              }
+            }
+            return entry;
+          })
+        );
+
+        dailyJournal.entries = decryptedEntries;
+        dailyJournals.push(dailyJournal);
+      }
+
+      // Filter by date range
+      const filteredJournals = dailyJournals.filter((journal) => {
+        const journalDate = journal.date;
+        return journalDate >= startDate && journalDate <= endDate;
+      });
+
+      return filteredJournals;
     } catch (error) {
       console.error("Error getting journal history:", error);
-      throw error;
+      throw new Error("Failed to get journal history");
     }
   },
 

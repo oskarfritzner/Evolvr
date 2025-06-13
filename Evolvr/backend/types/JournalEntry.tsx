@@ -1,22 +1,22 @@
 import { Timestamp } from "firebase/firestore";
 
 export enum JournalType {
-  GRATITUDE = 'gratitude',
-  GOALS = 'goals',
-  REFLECTION = 'reflection'
+  GRATITUDE = "gratitude",
+  GOALS = "goals",
+  REFLECTION = "reflection",
 }
 
 export interface GratitudeEntry {
-  items: string[];  // Array of 3 gratitude items
+  items: string[]; // Array of 3 gratitude items
 }
 
 export interface SmartGoal {
   id: string;
   description: string;
   isCompleted: boolean;
-  measurable?: string;  // How will progress be measured
-  deadline?: string;    // Target completion date
-  steps?: string[];     // Breaking down the goal into actionable steps
+  measurable?: string; // How will progress be measured
+  deadline?: string; // Target completion date
+  steps?: string[]; // Breaking down the goal into actionable steps
 }
 
 export interface GoalsEntry {
@@ -39,6 +39,7 @@ export interface JournalEntry {
   timestamp: Timestamp;
   xpAwarded: boolean;
   content: GratitudeEntry | GoalsEntry | ReflectionEntry;
+  isEncrypted?: boolean; // New field to indicate if the entry is encrypted
 }
 
 // Daily Journal Document (groups all entries for a day)

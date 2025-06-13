@@ -14,8 +14,6 @@ import { JournalType } from "@/backend/types/JournalEntry";
 import RoutineGrid from "@/components/routines/RoutineGrid";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import ChallengeGrid from "@/components/challenges/ChallengeGrid";
-
-import { JournalModal } from "@/components/journal/JournalModal";
 import AllHabits from "@/components/habit/AllHabits";
 import CategoryCardSlider from "@/components/category/CategoryCardSlider/CategoryCardSlider";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,6 +27,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { WelcomeModal } from "@/components/modals/WelcomeModal";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import QuickActionsBtnsBar from "@/components/quickActions/QuickActionsBtnsBar";
+import { Routine } from "@/backend/types/Routine";
+import CreateRoutine from "@/components/routines/CreateRoutine";
 
 export default function Dashboard() {
   const { colors } = useTheme();
@@ -37,10 +37,9 @@ export default function Dashboard() {
   const router = useRouter();
 
   // Define all state hooks first, before any other hooks
-  const [journalModalVisible, setJournalModalVisible] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
-  const [selectedJournalType, setSelectedJournalType] =
-    useState<JournalType | null>(null);
+  const [editRoutineModalVisible, setEditRoutineModalVisible] = useState(false);
+  const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
 
   // Only fetch user data when we have a user AND auth is initialized
   const {
@@ -263,9 +262,8 @@ export default function Dashboard() {
                 <RoutineGrid
                   compact={true}
                   onItemPress={(routine) => {
-                    router.push(
-                      `/(routinePages)/routineDetails/${routine.id}` as any
-                    );
+                    setSelectedRoutine(routine);
+                    setEditRoutineModalVisible(true);
                   }}
                 />
               </View>
@@ -286,20 +284,24 @@ export default function Dashboard() {
             </View>
           </View>
 
-          <JournalModal
-            visible={journalModalVisible}
-            onClose={() => {
-              setJournalModalVisible(false);
-              setSelectedJournalType(null);
-            }}
-            initialType={selectedJournalType}
-          />
-
           {/* Welcome Modal which open the first time the user enters after onboarding*/}
           <WelcomeModal
             visible={showWelcomeModal}
             onClose={() => {
               setShowWelcomeModal(false);
+            }}
+          />
+
+          <CreateRoutine
+            visible={editRoutineModalVisible}
+            onClose={() => {
+              setEditRoutineModalVisible(false);
+              setSelectedRoutine(null);
+            }}
+            routine={selectedRoutine}
+            onRoutineCreated={() => {
+              setEditRoutineModalVisible(false);
+              setSelectedRoutine(null);
             }}
           />
         </View>
@@ -352,14 +354,14 @@ const styles = (colors: any) =>
       web: {
         flexDirection: "row",
         flexWrap: "wrap",
-        gap: 16,
-        padding: 16,
+        gap: 24,
+        padding: 24,
         width: "100%",
       },
       default: {
         flexDirection: "column",
-        gap: 12,
-        padding: 12,
+        gap: 16,
+        padding: 16,
       },
     }),
     card: Platform.select({
@@ -376,6 +378,7 @@ const styles = (colors: any) =>
         shadowRadius: 3.84,
         elevation: 5,
         overflow: "visible",
+        padding: 16,
       },
       default: {
         width: "100%",
@@ -389,6 +392,7 @@ const styles = (colors: any) =>
         shadowRadius: 3.84,
         elevation: 5,
         overflow: "visible",
+        padding: 16,
       },
     }),
     section: {

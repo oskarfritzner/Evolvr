@@ -1,60 +1,89 @@
-import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
+import React from "react";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { Text } from "react-native-paper";
+import { useTheme } from "@/context/ThemeContext";
 
 interface MoodSelectorProps {
   value: number;
-  onChange: (mood: number) => void;
+  onChange: (value: number) => void;
 }
 
-export const MoodSelector = ({ value, onChange }: MoodSelectorProps) => {
-  const moods = [1, 2, 3, 4, 5];
+const moods = [
+  { value: 1, emoji: "😢", label: "Sad" },
+  { value: 2, emoji: "😕", label: "Meh" },
+  { value: 3, emoji: "😐", label: "Neutral" },
+  { value: 4, emoji: "🙂", label: "Good" },
+  { value: 5, emoji: "😊", label: "Great" },
+];
+
+export default function MoodSelector({ value, onChange }: MoodSelectorProps) {
   const { colors } = useTheme();
+
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: colors.labelPrimary }]}>How are you feeling?</Text>
-      <View style={styles.moodRow}>
+      <Text style={[styles.label, { color: colors.textPrimary }]}>Mood</Text>
+      <View style={styles.moodContainer}>
         {moods.map((mood) => (
           <TouchableOpacity
-            key={mood}
+            key={mood.value}
             style={[
               styles.moodButton,
-              value === mood && styles.selected,
-              { borderColor: colors.border }
+              {
+                backgroundColor:
+                  value === mood.value ? colors.secondary : colors.surface,
+                borderColor: colors.border,
+              },
             ]}
-            onPress={() => onChange(mood)}
+            onPress={() => onChange(mood.value)}
           >
-            <Text style={{ color: colors.labelPrimary }}>{getMoodEmoji(mood)}</Text>
+            <Text style={styles.emoji}>{mood.emoji}</Text>
+            <Text
+              style={[
+                styles.moodLabel,
+                {
+                  color:
+                    value === mood.value
+                      ? colors.surface
+                      : colors.textSecondary,
+                },
+              ]}
+            >
+              {mood.label}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
     </View>
   );
-};
-
-const getMoodEmoji = (mood: number): string => {
-  const emojis = ['😢', '😕', '😐', '🙂', '😄'];
-  return emojis[mood - 1];
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 10,
+    marginBottom: 16,
   },
   label: {
+    fontSize: 16,
+    fontWeight: "500",
     marginBottom: 8,
   },
-  moodRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  moodContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
   },
   moodButton: {
-    padding: 10,
-    borderRadius: 20,
+    flex: 1,
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
   },
-  selected: {
-    backgroundColor: '#e3e3e3',
+  emoji: {
+    fontSize: 24,
+    marginBottom: 4,
   },
-}); 
+  moodLabel: {
+    fontSize: 12,
+    textAlign: "center",
+  },
+});

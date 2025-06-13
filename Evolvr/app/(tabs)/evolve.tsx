@@ -4,9 +4,9 @@ import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import ActiveTasksList from "@/components/tasks/activeTasksList";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useUserData } from "@/hooks/queries/useUserData";
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function EvolveContent() {
   const { colors } = useTheme();
@@ -20,16 +20,20 @@ function EvolveContent() {
     safeArea: {
       flex: 1,
       backgroundColor: colors.background,
+      alignItems: "center",
     },
     header: {
-      paddingTop: Platform.OS === 'ios' ? insets.top : 16,
+      paddingTop: Platform.OS === "ios" ? insets.top : 16,
       paddingBottom: 16,
       paddingHorizontal: 20,
       backgroundColor: colors.background,
+      width: "100%",
     },
     container: {
       flex: 1,
       backgroundColor: colors.background,
+      width: "100%",
+      maxWidth: 800,
     },
     contentContainer: {
       flex: 1,
@@ -50,7 +54,5 @@ function EvolveContent() {
 }
 
 export default function Evolve() {
-  return (
-    <EvolveContent />
-  );
+  return <EvolveContent />;
 }

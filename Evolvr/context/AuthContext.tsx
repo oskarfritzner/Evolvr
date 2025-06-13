@@ -28,6 +28,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { authValidation } from "@/utils/authValidation";
 import { useRegistration } from "@/hooks/auth/useRegistration";
 import Toast from "react-native-toast-message";
+import { toastConfig } from "@/utils/toastConfig";
 
 // Define the extended User type that includes userData
 interface AuthUser {
@@ -47,14 +48,6 @@ interface AuthContextType {
 
 // Create the context with proper typing
 const AuthContext = createContext<AuthContextType | null>(null);
-
-// Create a client-side only Toast wrapper
-function ClientSideToast() {
-  const canUseDOM = typeof window !== "undefined";
-  if (!canUseDOM) return null;
-
-  return <Toast config={toastConfig} />;
-}
 
 // Loading spinner component
 function LoadingSpinner() {
@@ -478,3 +471,11 @@ const initializeUserData = async (
     logger.error("Error initializing user data:", error);
   }
 };
+
+// Create a client-side only Toast wrapper
+function ClientSideToast() {
+  const canUseDOM = typeof window !== "undefined";
+  if (!canUseDOM) return null;
+
+  return <Toast config={toastConfig} />;
+}

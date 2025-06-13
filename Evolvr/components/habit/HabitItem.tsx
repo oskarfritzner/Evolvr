@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import Toast from "react-native-toast-message";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Platform } from "react-native";
+import { Timestamp } from "firebase/firestore";
 
 interface HabitItemProps {
   habit: Habit;
@@ -46,9 +47,20 @@ export default function HabitItem({
   const progressDays = Array(66)
     .fill(null)
     .map((_, index) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dayDate = new Date(today.getTime() + index * 24 * 60 * 60 * 1000);
+
+      // Find if this day exists in completedDays
+      const existingDay = habit.completedDays.find((day) => {
+        const dayDateObj =
+          day.date instanceof Timestamp ? day.date.toDate() : day.date;
+        return dayDateObj.toDateString() === dayDate.toDateString();
+      });
+
       return (
-        habit.completedDays[index] || {
-          date: new Date(),
+        existingDay || {
+          date: dayDate,
           completed: false,
         }
       );

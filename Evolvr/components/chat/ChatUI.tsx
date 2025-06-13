@@ -1,40 +1,36 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
-import { FontAwesome5 } from '@expo/vector-icons';
-import { TaskCreator } from './modes/taskCreator/TaskCreator';
-import { GoalDivider } from './modes/goalDivider/GoalDivider';
-import { MindsetCoach } from './modes/mindsetCoach/MindsetCoach';
+import React, { useState } from "react";
+import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { TaskCreator } from "./modes/taskCreator/TaskCreator";
+import { GoalDivider } from "./modes/goalDivider/GoalDivider";
 
 interface ChatUIProps {
-  mode: 'taskCreator' | 'goalDivider' | 'mindsetCoach';
+  mode: "taskCreator" | "goalDivider";
   onClose?: () => void;
-  onModeChange?: (mode: 'taskCreator' | 'goalDivider' | 'mindsetCoach') => void;
+  onModeChange?: (mode: "taskCreator" | "goalDivider") => void;
 }
 
-const MODE_DISPLAY_NAMES: Record<'taskCreator' | 'goalDivider' | 'mindsetCoach', string> = {
-  taskCreator: 'Task Creator',
-  goalDivider: 'Goal Divider',
-  mindsetCoach: 'AI Mindset Coach'
+const MODE_DISPLAY_NAMES: Record<"taskCreator" | "goalDivider", string> = {
+  taskCreator: "Task Creator",
+  goalDivider: "Goal Divider",
 };
 
 export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
   const { colors } = useTheme();
   const [showModeSelector, setShowModeSelector] = useState(false);
 
-  const handleModeSelect = (selectedMode: 'taskCreator' | 'goalDivider' | 'mindsetCoach') => {
+  const handleModeSelect = (selectedMode: "taskCreator" | "goalDivider") => {
     onModeChange?.(selectedMode);
     setShowModeSelector(false);
   };
 
   const renderMode = () => {
     switch (mode) {
-      case 'taskCreator':
+      case "taskCreator":
         return <TaskCreator onClose={onClose || (() => {})} />;
-      case 'goalDivider':
+      case "goalDivider":
         return <GoalDivider onClose={onClose || (() => {})} />;
-      case 'mindsetCoach':
-        return <MindsetCoach onClose={onClose || (() => {})} />;
       default:
         return null;
     }
@@ -43,20 +39,29 @@ export function ChatUI({ mode, onClose, onModeChange }: ChatUIProps) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {showModeSelector && (
-        <View style={[styles.modeMenu, { 
-          backgroundColor: colors.surfaceContainer,
-          borderColor: colors.border,
-        }]}>
+        <View
+          style={[
+            styles.modeMenu,
+            {
+              backgroundColor: colors.surfaceContainer,
+              borderColor: colors.border,
+            },
+          ]}
+        >
           {Object.entries(MODE_DISPLAY_NAMES).map(([key, name]) => (
-            <TouchableOpacity 
+            <TouchableOpacity
               key={key}
               style={[
                 styles.modeMenuItem,
-                { borderBottomColor: colors.border }
+                { borderBottomColor: colors.border },
               ]}
-              onPress={() => handleModeSelect(key as 'taskCreator' | 'goalDivider' | 'mindsetCoach')}
+              onPress={() =>
+                handleModeSelect(key as "taskCreator" | "goalDivider")
+              }
             >
-              <Text style={[styles.modeMenuText, { color: colors.textPrimary }]}>
+              <Text
+                style={[styles.modeMenuText, { color: colors.textPrimary }]}
+              >
                 {name}
               </Text>
             </TouchableOpacity>
@@ -73,12 +78,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modeMenu: {
-    position: 'absolute',
+    position: "absolute",
     top: 64,
     left: 16,
     borderRadius: 8,
     borderWidth: 1,
-    overflow: 'hidden',
+    overflow: "hidden",
     zIndex: 1000,
     elevation: 5,
     shadowColor: "#000",
@@ -96,6 +101,6 @@ const styles = StyleSheet.create({
   },
   modeMenuText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
-}); 
+});

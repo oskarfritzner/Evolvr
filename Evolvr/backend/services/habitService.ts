@@ -368,6 +368,9 @@ export const habitService = {
       const missedHabits: { habit: Habit; daysMissed: number }[] = [];
 
       for (const habit of habits) {
+        // Skip habits that are already completed today
+        if (habit.completedToday) continue;
+
         const lastCompletedDay = habit.completedDays
           .filter((day) => day.completed)
           .sort((a, b) => {
@@ -399,9 +402,8 @@ export const habitService = {
         }
       }
 
-      // If there are missed habits, notify the user
+      // If there are missed habits, update the user's data
       if (missedHabits.length > 0) {
-        // Store missed habits in user's data for UI to display
         const userRef = doc(db, "users", userId);
         await updateDoc(userRef, {
           missedHabits: missedHabits.map(({ habit, daysMissed }) => ({
@@ -432,40 +434,51 @@ export const habitService = {
 
   // Reset habit progress with user confirmation
   async resetHabitProgress(
+    userId: string,
     habitId: string,
     shouldRestart: boolean = false
   ): Promise<void> {
     try {
-      const habitRef = doc(db, "habits", habitId);
-      const habitDoc = await getDoc(habitRef);
-      const habit = habitDoc.data() as Habit;
+      const userRef = doc(db, "users", userId);
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data() as UserData;
+
+      if (!userData?.habits?.[habitId]) {
+        throw new Error("Habit not found");
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
       if (!shouldRestart) {
-        // If not restarting, just mark as missed but keep progress
-        await updateDoc(habitRef, {
-          streak: 0,
-          completedToday: false,
-          lastMissedDate: Timestamp.now(),
+        // If continuing, just reset the streak and mark today as not completed
+        await updateDoc(userRef, {
+          [`habits.${habitId}.streak`]: 0,
+          [`habits.${habitId}.completedToday`]: false,
+          [`habits.${habitId}.task.completed`]: false,
+          [`habits.${habitId}.task.completedAt`]: null,
+          [`habits.${habitId}.lastMissedDate`]: Timestamp.now(),
         });
         return;
       }
 
-      // If restarting, reset everything
-      const today = new Date();
-      const newCompletionProgress = Array(66)
+      // If restarting, reset everything and create new completion days array
+      const newCompletionDays = Array(66)
         .fill(null)
         .map((_, index) => ({
           date: new Date(today.getTime() + index * 24 * 60 * 60 * 1000),
           completed: false,
         }));
 
-      await updateDoc(habitRef, {
-        streak: 0,
-        completedToday: false,
-        completionProgress: newCompletionProgress,
-        isEstablished: false,
-        updatedAt: new Date(),
-        lastMissedDate: null, // Clear the missed date when restarting
+      await updateDoc(userRef, {
+        [`habits.${habitId}.streak`]: 0,
+        [`habits.${habitId}.completedToday`]: false,
+        [`habits.${habitId}.completedDays`]: newCompletionDays,
+        [`habits.${habitId}.task.completed`]: false,
+        [`habits.${habitId}.task.completedAt`]: null,
+        [`habits.${habitId}.isEstablished`]: false,
+        [`habits.${habitId}.updatedAt`]: Timestamp.now(),
+        [`habits.${habitId}.lastMissedDate`]: null,
       });
 
       // Show confirmation toast

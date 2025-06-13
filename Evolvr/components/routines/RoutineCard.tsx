@@ -200,19 +200,6 @@ export default function RoutineCard({
                 )}
               </View>
               <View style={styles.metadata}>
-                <View style={styles.metadataItem}>
-                  <FontAwesome5
-                    name="tasks"
-                    size={16}
-                    color={colors.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.metadataText,
-                      { color: colors.textSecondary },
-                    ]}
-                  >{`${routine.tasks.length} tasks`}</Text>
-                </View>
                 {Boolean(routine.metadata?.currentStreak) &&
                 routine.metadata ? (
                   <View style={styles.metadataItem}>

@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
-import {
-  Modal,
-  SafeAreaView,
-  StyleSheet,
-} from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
-import { ChatUI } from './ChatUI';
+import React, { useState } from "react";
+import { Modal, SafeAreaView, StyleSheet } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
+import { ChatUI } from "./ChatUI";
 
 interface ChatModalProps {
   visible: boolean;
   onClose: () => void;
-  mode: 'taskCreator' | 'goalDivider' | 'mindsetCoach';
+  mode: "taskCreator" | "goalDivider";
 }
 
-export function ChatModal({ visible, onClose, mode: initialMode }: ChatModalProps) {
+export function ChatModal({
+  visible,
+  onClose,
+  mode: initialMode,
+}: ChatModalProps) {
   const { colors } = useTheme();
   const [currentMode, setCurrentMode] = useState(initialMode);
 
@@ -30,9 +30,11 @@ export function ChatModal({ visible, onClose, mode: initialMode }: ChatModalProp
       presentationStyle="formSheet"
       onRequestClose={handleClose}
     >
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <ChatUI 
-          mode={currentMode} 
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
+        <ChatUI
+          mode={currentMode}
           onClose={handleClose}
           onModeChange={setCurrentMode}
         />
@@ -45,4 +47,4 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-}); 
+});

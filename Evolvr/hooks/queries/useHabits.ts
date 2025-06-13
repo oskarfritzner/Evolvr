@@ -3,6 +3,9 @@ import { habitService } from "@/backend/services/habitService";
 import type { Habit } from "@/backend/types/Habit";
 import type Task from "@/backend/types/Task";
 import React from "react";
+import { getDoc, doc } from "firebase/firestore";
+import { db } from "@/backend/config/firebase";
+import { UserData } from "@/backend/types/UserData";
 
 export function useHabits(userId: string | undefined) {
   const queryClient = useQueryClient();
@@ -36,6 +39,16 @@ export function useHabits(userId: string | undefined) {
     queryFn: () => {
       if (!userId) throw new Error("No user ID provided");
       return habitService.getTodaysHabitTasks(userId);
+    },
+    enabled: !!userId,
+  });
+
+  const { data: userData } = useQuery({
+    queryKey: ["userData", userId],
+    queryFn: async () => {
+      if (!userId) throw new Error("No user ID provided");
+      const userDoc = await getDoc(doc(db, "users", userId));
+      return userDoc.data() as UserData;
     },
     enabled: !!userId,
   });
@@ -97,5 +110,6 @@ export function useHabits(userId: string | undefined) {
     isLoading,
     createHabit: createHabitMutation.mutateAsync,
     refetchHabits: refetch,
+    userData,
   };
 }
