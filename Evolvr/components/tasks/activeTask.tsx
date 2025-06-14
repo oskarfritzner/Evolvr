@@ -1,21 +1,32 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Pressable, Animated, Alert } from 'react-native';
-import type Task from '@/backend/types/Task';
-import { FontAwesome5 } from '@expo/vector-icons';
-import { useTheme } from '@/context/ThemeContext';
-import { UserData } from '@/backend/types/UserData';
-import { TaskType } from '@/backend/types/Task';
-import { RoutineTaskWithMeta, RoutineTask } from '@/backend/types/Routine';
-import { ParticipantData } from '@/backend/types/Participant';
-import { Avatar } from '@/components/ui/Avatar';
-import { MotiView } from 'moti';
-import { MotiPressable } from 'moti/interactions';
-import { Easing } from 'react-native-reanimated';
-import { levelService } from '@/backend/services/levelService';
-import { useAuth } from '@/context/AuthContext';
-import { useQueryClient } from '@tanstack/react-query';
-import Toast from 'react-native-toast-message';
-import { router } from 'expo-router';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Pressable,
+  Animated,
+  Alert,
+} from "react-native";
+import type Task from "@/backend/types/Task";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "@/context/ThemeContext";
+import { UserData } from "@/backend/types/UserData";
+import { TaskType } from "@/backend/types/Task";
+import { RoutineTaskWithMeta, RoutineTask } from "@/backend/types/Routine";
+import { ParticipantData } from "@/backend/types/Participant";
+import { Avatar } from "@/components/ui/Avatar";
+import { MotiView } from "moti";
+import { MotiPressable } from "moti/interactions";
+import { Easing } from "react-native-reanimated";
+import { levelService } from "@/backend/services/levelService";
+import { useAuth } from "@/context/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import Toast from "react-native-toast-message";
+import { router } from "expo-router";
+import { TaskCompletionModal } from "./modals/TaskCompletionModal";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Constants from levelService
 const CHALLENGE_BONUS = 0.15; // 15% bonus for challenge tasks
@@ -24,42 +35,95 @@ interface ActiveTaskProps {
   task: ((Task & { type: TaskType }) | RoutineTaskWithMeta) & {
     streak?: number;
   };
-  onComplete?: (taskId: string) => void;
+  onComplete?: (
+    taskId: string,
+    completionData?: { duration: number; feedback: string }
+  ) => void;
   participants?: ParticipantData[];
 }
 
-const ActiveTask: React.FC<ActiveTaskProps> = ({ task, onComplete, participants }) => {
+const ActiveTask: React.FC<ActiveTaskProps> = ({
+  task,
+  onComplete,
+  participants,
+}) => {
   const { colors } = useTheme();
   const { user } = useAuth();
   const [isCompleting, setIsCompleting] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [hasShownCompletionTip, setHasShownCompletionTip] = useState(false);
   const queryClient = useQueryClient();
 
   // Get participants either from props or from task
-  const taskParticipants = participants || ('participants' in task ? task.participants : []);
+  const taskParticipants =
+    participants || ("participants" in task ? task.participants : []);
 
   // Get today's date string for checking completions
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   // Check if task is a routine task and has completions
   const routineTask = task as RoutineTaskWithMeta;
-  const todayCompletions = routineTask.routineId ? 
-    routineTask.completions?.[today] || [] : [];
+  const todayCompletions = routineTask.routineId
+    ? routineTask.completions?.[today] || []
+    : [];
 
-  const handleComplete = async () => {
+  // Get task title based on type
+  const taskTitle =
+    "type" in task && task.type === "routine"
+      ? (task as RoutineTaskWithMeta).taskName
+      : (task as Task).title;
+
+  const handleComplete = async (completionData?: {
+    duration: number;
+    feedback: string;
+  }) => {
     if (isCompleting || !user?.uid) return;
-    
+
     try {
       setIsCompleting(true);
-      
+
       if (onComplete) {
-        await onComplete(task.id);
+        await onComplete(task.id, completionData);
       }
-    } catch (error) {
-      console.error('Error completing task:', error);
+
+      // Show completion tip if it's the first time and no notes/time were added
+      if (!completionData && !hasShownCompletionTip) {
+        const hasShownTip = await AsyncStorage.getItem("hasShownCompletionTip");
+        if (!hasShownTip) {
+          Toast.show({
+            type: "info",
+            text1: "Tip",
+            text2:
+              "You can add notes and time spent to your tasks when completing them!",
+            position: "bottom",
+            visibilityTime: 4000,
+          });
+          await AsyncStorage.setItem("hasShownCompletionTip", "true");
+          setHasShownCompletionTip(true);
+        }
+      }
+
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["routineTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["userData"] });
+
+      // Show success message
       Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error instanceof Error ? error.message : 'Failed to complete task',
+        type: "success",
+        text1: "Task Completed!",
+        text2: completionData?.feedback
+          ? "Notes saved successfully"
+          : "Great job!",
+        position: "bottom",
+      });
+    } catch (error) {
+      console.error("Error completing task:", error);
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2:
+          error instanceof Error ? error.message : "Failed to complete task",
       });
     } finally {
       setIsCompleting(false);
@@ -67,7 +131,10 @@ const ActiveTask: React.FC<ActiveTaskProps> = ({ task, onComplete, participants 
   };
 
   // Disable the button if task is already completing or user has already completed it
-  const isDisabled = Boolean(isCompleting || (user?.uid && todayCompletions.some(c => c.completedBy === user.uid)));
+  const isDisabled = Boolean(
+    isCompleting ||
+      (user?.uid && todayCompletions.some((c) => c.completedBy === user.uid))
+  );
 
   const renderParticipants = (taskParticipants: ParticipantData[]) => {
     if (!taskParticipants?.length) return null;
@@ -75,39 +142,50 @@ const ActiveTask: React.FC<ActiveTaskProps> = ({ task, onComplete, participants 
     return (
       <View style={styles.participantsContainer}>
         {taskParticipants.slice(0, 3).map((participant, index) => (
-          <View 
+          <View
             key={`${participant.id}-${index}`}
             style={[
               styles.participantWrapper,
-              { 
+              {
                 marginLeft: index > 0 ? -10 : 0,
-                borderColor: colors.surface 
-              }
+                borderColor: colors.surface,
+              },
             ]}
           >
-            <Avatar 
-              size={24}
-              uri={participant.photoURL}
-            />
-            {todayCompletions.some(c => c.completedBy === participant.id) ? (
-              <View style={[styles.completedOverlay, { backgroundColor: colors.surface + '99' }]}>
+            <Avatar size={24} uri={participant.photoURL} />
+            {todayCompletions.some((c) => c.completedBy === participant.id) ? (
+              <View
+                style={[
+                  styles.completedOverlay,
+                  { backgroundColor: colors.surface + "99" },
+                ]}
+              >
                 <FontAwesome5 name="check" size={12} color={colors.secondary} />
               </View>
             ) : (
-              <View style={[styles.incompleteMask, { backgroundColor: colors.surface + '40' }]} />
+              <View
+                style={[
+                  styles.incompleteMask,
+                  { backgroundColor: colors.surface + "40" },
+                ]}
+              />
             )}
           </View>
         ))}
         {taskParticipants.length > 3 && (
-          <View style={[
-            styles.moreParticipants, 
-            { 
-              backgroundColor: colors.primary,
-              marginLeft: -10,
-              borderColor: colors.surface 
-            }
-          ]}>
-            <Text style={[styles.moreParticipantsText, { color: colors.surface }]}>
+          <View
+            style={[
+              styles.moreParticipants,
+              {
+                backgroundColor: colors.primary,
+                marginLeft: -10,
+                borderColor: colors.surface,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.moreParticipantsText, { color: colors.surface }]}
+            >
               +{taskParticipants.length - 3}
             </Text>
           </View>
@@ -118,39 +196,54 @@ const ActiveTask: React.FC<ActiveTaskProps> = ({ task, onComplete, participants 
 
   const getTaskSource = () => {
     const sourceIcon = {
-      routine: 'calendar-check',
-      habit: 'bolt',
-      challenge: 'trophy',
-      normal: 'tasks',
-      'user-generated': 'user',
-    }[task.type || 'normal'];
+      routine: "calendar-check",
+      habit: "bolt",
+      challenge: "trophy",
+      normal: "tasks",
+      "user-generated": "user",
+    }[task.type || "normal"];
 
-    let sourceName = '';
-    let challengeId = '';
-    
-    if ('routineTitle' in task) {
+    let sourceName = "";
+    let challengeId = "";
+
+    if ("routineTitle" in task) {
       sourceName = task.routineTitle;
-    } else if ('challengeTitle' in task && 'challengeId' in task) {
+    } else if ("challengeTitle" in task && "challengeId" in task) {
       sourceName = task.challengeTitle as string;
       challengeId = task.challengeId as string;
     } else if (task.context?.name) {
       sourceName = task.context.name;
     }
 
-    const taskType = task.type || 'normal';
-    const displayName = sourceName || taskType.charAt(0).toUpperCase() + taskType.slice(1);
+    const taskType = task.type || "normal";
+    const displayName =
+      sourceName || taskType.charAt(0).toUpperCase() + taskType.slice(1);
 
     return (
       <View style={styles.sourceRow}>
-        <FontAwesome5 name={sourceIcon} size={12} color={colors.textSecondary} />
-        {task.type === 'challenge' && challengeId ? (
+        <FontAwesome5
+          name={sourceIcon}
+          size={12}
+          color={colors.textSecondary}
+        />
+        {task.type === "challenge" && challengeId ? (
           <TouchableOpacity
-            onPress={() => router.push({
-              pathname: "/(modals)/challenge",
-              params: { id: challengeId }
-            })}
+            onPress={() =>
+              router.push({
+                pathname: "/(modals)/challenge",
+                params: { id: challengeId },
+              })
+            }
           >
-            <Text style={[styles.sourceText, { color: colors.textSecondary, textDecorationLine: 'underline' }]}>
+            <Text
+              style={[
+                styles.sourceText,
+                {
+                  color: colors.textSecondary,
+                  textDecorationLine: "underline",
+                },
+              ]}
+            >
               {displayName}
             </Text>
           </TouchableOpacity>
@@ -164,8 +257,8 @@ const ActiveTask: React.FC<ActiveTaskProps> = ({ task, onComplete, participants 
   };
 
   const renderHabitInfo = () => {
-    if (task.type !== 'habit' || !task.streak) return null;
-    
+    if (task.type !== "habit" || !task.streak) return null;
+
     return (
       <View style={styles.habitInfo}>
         <Text style={[styles.habitStreak, { color: colors.secondary }]}>
@@ -177,97 +270,97 @@ const ActiveTask: React.FC<ActiveTaskProps> = ({ task, onComplete, participants 
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
+      <TaskCompletionModal
+        visible={showCompletionModal}
+        onClose={() => setShowCompletionModal(false)}
+        onComplete={(data) => {
+          setShowCompletionModal(false);
+          handleComplete(data);
+        }}
+        taskTitle={taskTitle}
+      />
+
       <View style={styles.content}>
         <View style={styles.leftContent}>
           <View style={styles.titleRow}>
-            <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={2}>
-              {('taskName' in task ? task.taskName : task.title) || 'Untitled Task'}
+            <Text
+              style={[styles.title, { color: colors.textPrimary }]}
+              numberOfLines={2}
+            >
+              {("taskName" in task ? task.taskName : task.title) ||
+                "Untitled Task"}
             </Text>
             {getTaskSource()}
           </View>
-          
-          {/* XP badges */}
-          <View style={styles.xpRow}>
-            {Object.entries(task.categoryXp || {}).map(([category, xp]) => {
-              // Calculate bonus XP for challenge tasks
-              const baseXP = xp || 0;
-              const isChallenge = task.type === 'challenge';
-              const bonusXP = isChallenge ? Math.floor(baseXP * CHALLENGE_BONUS) : 0;
-              const totalXP = baseXP + bonusXP;
 
-              return (
-                <View 
-                  key={`${task.id}-${category}`}
-                  style={[styles.xpBadge, { backgroundColor: colors.secondary + '20' }]}
-                >
-                  <Text style={[styles.xpText, { color: colors.secondary }]}>
-                    {category}: {baseXP}XP {isChallenge && bonusXP > 0 && `(+${bonusXP})`}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
+          {/* Challenge Type */}
+          {task.type === "challenge" && (
+            <Text
+              style={[styles.challengeType, { color: colors.textSecondary }]}
+            >
+              {task.context?.name}
+            </Text>
+          )}
 
           {renderHabitInfo()}
         </View>
 
-        <View style={styles.participantsContainer}>
-          {taskParticipants.map((participant, index) => (
-            <View 
-              key={`${participant.id}-${index}`}
+        <View style={styles.rightContent}>
+          <View style={styles.actionRow}>
+            {renderParticipants(taskParticipants)}
+            <TouchableOpacity
               style={[
-                styles.participantWrapper,
-                { 
-                  marginLeft: index > 0 ? -10 : 0,
-                  borderColor: colors.surface 
-                }
+                styles.completeButton,
+                {
+                  backgroundColor: isDisabled
+                    ? colors.labelDisabled
+                    : colors.secondary,
+                  opacity: isDisabled ? 0.5 : 1,
+                },
               ]}
+              onPress={() => setShowCompletionModal(true)}
+              disabled={isDisabled}
             >
-              <Avatar 
-                size={24}
-                uri={participant.photoURL}
-              />
-              {todayCompletions.some(c => c.completedBy === participant.id) && (
-                <View style={[styles.completedOverlay, { backgroundColor: colors.surface + '99' }]}>
-                  <FontAwesome5 name="check" size={12} color={colors.secondary} />
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
-
-        {/* Show completion overlay if all participants completed */}
-        {('allCompleted' in task && task.allCompleted) && (
-          <View style={[styles.allCompletedOverlay, { backgroundColor: colors.surface + 'CC' }]}>
-            <FontAwesome5 name="check-circle" size={24} color={colors.secondary} />
-            <Text style={[styles.allCompletedText, { color: colors.textPrimary }]}>
-              Completed by everyone
-            </Text>
+              <Text
+                style={[
+                  styles.completeButtonText,
+                  { color: colors.background },
+                ]}
+              >
+                Complete
+              </Text>
+            </TouchableOpacity>
           </View>
-        )}
+        </View>
       </View>
 
-      {/* Complete button - disabled if user already completed */}
-      <MotiPressable 
-        onPress={handleComplete}
-        disabled={isDisabled}
-        style={[
-          styles.completeButton,
-          { 
-            backgroundColor: isDisabled ? colors.labelDisabled : colors.secondary,
-            opacity: isDisabled ? 0.5 : 1
-          }
-        ]}
-      >
-        <FontAwesome5 
-          name={isDisabled ? "check" : "check"}
-          size={16} 
-          color={colors.surface} 
-        />
-        <Text style={[styles.buttonText, { color: colors.surface }]}>
-          {isDisabled ? "Completed" : "Complete"}
-        </Text>
-      </MotiPressable>
+      {/* XP badges moved to bottom */}
+      <View style={styles.xpRow}>
+        {Object.entries(task.categoryXp || {}).map(([category, xp]) => {
+          // Calculate bonus XP for challenge tasks
+          const baseXP = xp || 0;
+          const isChallenge = task.type === "challenge";
+          const bonusXP = isChallenge
+            ? Math.floor(baseXP * CHALLENGE_BONUS)
+            : 0;
+          const totalXP = baseXP + bonusXP;
+
+          return (
+            <View
+              key={`${task.id}-${category}`}
+              style={[
+                styles.xpBadge,
+                { backgroundColor: colors.secondary + "20" },
+              ]}
+            >
+              <Text style={[styles.xpText, { color: colors.secondary }]}>
+                {category}: {baseXP}XP{" "}
+                {isChallenge && bonusXP > 0 && `(+${bonusXP})`}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 };
@@ -277,42 +370,41 @@ export default ActiveTask;
 // Styles for the component
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    padding: 12,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   content: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
   },
   leftContent: {
     flex: 1,
+    marginRight: 16,
+  },
+  rightContent: {
+    alignItems: "flex-end",
   },
   titleRow: {
-    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 20,
-    marginBottom: 6,
+    fontWeight: "600",
+    flex: 1,
   },
-  sourceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-  sourceText: {
-    fontSize: 13,
-    opacity: 0.8,
+  challengeType: {
+    fontSize: 14,
+    marginBottom: 8,
   },
   xpRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   xpBadge: {
     paddingHorizontal: 8,
@@ -321,44 +413,47 @@ const styles = StyleSheet.create({
   },
   xpText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: "500",
+  },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   completeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 8,
-    justifyContent: 'center',
+    borderRadius: 22,
+    minWidth: 100,
+    alignItems: "center",
   },
-  buttonText: {
+  completeButtonText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   participantsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginLeft: 8,
   },
   participantWrapper: {
-    position: 'relative', // For overlay positioning
+    position: "relative", // For overlay positioning
     borderWidth: 2,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   completedOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   incompleteMask: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -369,35 +464,29 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1.5,
   },
   moreParticipantsText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   habitInfo: {
     marginTop: 8,
   },
   habitStreak: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: "500",
   },
-  allCompletedOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
+  sourceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
   },
-  allCompletedText: {
-    fontSize: 16,
-    fontWeight: '600',
+  sourceText: {
+    fontSize: 13,
+    opacity: 0.8,
   },
 });

@@ -128,11 +128,12 @@ export default function ActiveTasksList() {
                   styles.taskCardInner,
                   { backgroundColor: colors.surface },
                 ]}
+                contentStyle={{ padding: 0 }}
               >
                 <ActiveTask
                   task={{ ...task, type }}
-                  onComplete={() =>
-                    handleComplete(task.id || task.taskId, type)
+                  onComplete={(taskId, completionData) =>
+                    handleComplete(taskId || task.taskId, type)
                   }
                   participants={task.participants}
                 />
@@ -253,10 +254,11 @@ const styles = StyleSheet.create({
   },
   taskCard: {
     marginBottom: 12,
-    width: "100%",
+    borderRadius: 12,
+    overflow: "hidden",
   },
   taskCardInner: {
-    borderRadius: 16,
+    borderRadius: 12,
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: {
@@ -265,7 +267,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    padding: 16,
   },
   emptyContainer: {
     flex: 1,

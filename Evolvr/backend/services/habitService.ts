@@ -161,9 +161,60 @@ export const habitService = {
         return habit.task as Task;
       }
 
-      const newStreak = habit.streak + 1;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Get the last completed day
+      const lastCompletedDay = habit.completedDays
+        .filter((day) => day.completed)
+        .sort((a, b) => {
+          const dateA = a.date instanceof Timestamp ? a.date.toDate() : a.date;
+          const dateB = b.date instanceof Timestamp ? b.date.toDate() : b.date;
+          return dateB.getTime() - dateA.getTime();
+        })[0];
+
+      // Calculate if this is a consecutive day
+      let isConsecutiveDay = false;
+      if (lastCompletedDay) {
+        const lastDate =
+          lastCompletedDay.date instanceof Timestamp
+            ? lastCompletedDay.date.toDate()
+            : lastCompletedDay.date;
+        lastDate.setHours(0, 0, 0, 0);
+
+        const daysDifference = Math.floor(
+          (today.getTime() - lastDate.getTime()) / (24 * 60 * 60 * 1000)
+        );
+        isConsecutiveDay = daysDifference === 1;
+      }
+
+      // Calculate new streak
+      const newStreak = isConsecutiveDay ? habit.streak + 1 : 1;
       const newLongestStreak = Math.max(newStreak, habit.longestStreak || 0);
       const completedAt = Timestamp.now();
+
+      // Create new completion day entry
+      const newCompletionDay = {
+        date: completedAt,
+        completed: true,
+      };
+
+      // Update completedDays array to maintain 66-day window
+      const updatedCompletedDays = [
+        ...habit.completedDays.filter((day) => {
+          const dayDate =
+            day.date instanceof Timestamp ? day.date.toDate() : day.date;
+          const daysOld = Math.floor(
+            (today.getTime() - dayDate.getTime()) / (24 * 60 * 60 * 1000)
+          );
+          return daysOld < 66;
+        }),
+        newCompletionDay,
+      ].sort((a, b) => {
+        const dateA = a.date instanceof Timestamp ? a.date.toDate() : a.date;
+        const dateB = b.date instanceof Timestamp ? b.date.toDate() : b.date;
+        return dateA.getTime() - dateB.getTime();
+      });
 
       // Batch update to ensure atomicity
       const batch = writeBatch(db);
@@ -173,10 +224,7 @@ export const habitService = {
         [`habits.${habit.id}.completedToday`]: true,
         [`habits.${habit.id}.streak`]: newStreak,
         [`habits.${habit.id}.longestStreak`]: newLongestStreak,
-        [`habits.${habit.id}.completedDays`]: arrayUnion({
-          date: completedAt,
-          completed: true,
-        }),
+        [`habits.${habit.id}.completedDays`]: updatedCompletedDays,
         [`habits.${habit.id}.task.completed`]: true,
         [`habits.${habit.id}.task.completedAt`]: completedAt,
         "stats.totalTasksCompleted": increment(1),
@@ -458,6 +506,9 @@ export const habitService = {
           [`habits.${habitId}.task.completed`]: false,
           [`habits.${habitId}.task.completedAt`]: null,
           [`habits.${habitId}.lastMissedDate`]: Timestamp.now(),
+          // Clear the missedHabits array
+          missedHabits:
+            userData.missedHabits?.filter((h) => h.habitId !== habitId) || [],
         });
         return;
       }
@@ -479,6 +530,9 @@ export const habitService = {
         [`habits.${habitId}.isEstablished`]: false,
         [`habits.${habitId}.updatedAt`]: Timestamp.now(),
         [`habits.${habitId}.lastMissedDate`]: null,
+        // Clear the missedHabits array
+        missedHabits:
+          userData.missedHabits?.filter((h) => h.habitId !== habitId) || [],
       });
 
       // Show confirmation toast

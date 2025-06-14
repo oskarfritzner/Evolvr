@@ -269,9 +269,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setUser(null);
             setUserData(null);
             queryClient.clear(); // Clear all React Query cache on sign out
-            setTimeout(() => {
+            requestAnimationFrame(() => {
               router.replace("/sign-in");
-            }, 0);
+            });
           }
 
           setIsInitialized(true);
@@ -284,9 +284,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(null);
           setUserData(null);
           queryClient.clear();
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             router.replace("/sign-in");
-          }, 0);
+          });
         }
       });
     };
@@ -327,16 +327,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Finally, sign out from Firebase
       await firebaseSignOut(auth);
 
-      // Use a more reliable navigation approach
-      if (router.canGoBack()) {
+      // Use requestAnimationFrame to ensure layout is mounted
+      requestAnimationFrame(() => {
         router.replace("/sign-in");
-      } else {
-        // If we can't go back, we're likely at the root
-        // Use a small delay to ensure layout is mounted
-        requestAnimationFrame(() => {
-          router.replace("/sign-in");
-        });
-      }
+      });
     } catch (error) {
       logger.error("Error signing out:", error);
       throw error;

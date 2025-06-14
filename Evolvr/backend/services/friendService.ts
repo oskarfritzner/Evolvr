@@ -34,12 +34,42 @@ export const friendService = {
     senderPhotoURL?: string
   ): Promise<void> {
     try {
+      console.log("Starting friend request process...", {
+        senderId,
+        receiverId,
+        senderDisplayName,
+        senderPhotoURL,
+      });
+
       // Validate input
       if (!senderId || !receiverId) {
         throw new Error("Both sender and receiver IDs are required");
       }
 
+      if (senderId === receiverId) {
+        throw new Error("Cannot send friend request to yourself");
+      }
+
+      // Check if users are already friends
+      console.log("Checking if users are already friends...");
+      const userDoc = await getDoc(doc(db, "users", senderId));
+      const userData = userDoc.data();
+      console.log("User data retrieved:", {
+        exists: userDoc.exists(),
+        hasFriends: !!userData?.friends,
+        userData: userData,
+      });
+
+      if (
+        userData?.friends?.some(
+          (friend: FriendData) => friend.userId === receiverId
+        )
+      ) {
+        throw new Error("Users are already friends");
+      }
+
       // Check if a friend request already exists
+      console.log("Checking for existing friend requests...");
       const existingRequestsQuery = query(
         collection(db, "friendRequests"),
         where("senderId", "==", senderId),
@@ -48,30 +78,47 @@ export const friendService = {
       );
 
       const existingRequests = await getDocs(existingRequestsQuery);
+      console.log("Existing requests check:", {
+        exists: !existingRequests.empty,
+        requests: existingRequests.docs.map((doc) => doc.data()),
+      });
+
       if (!existingRequests.empty) {
         throw new Error("A friend request already exists");
       }
 
       // Get sender's data
+      console.log("Getting sender's data...");
       const senderDoc = await getDoc(doc(db, "users", senderId));
       const senderData = senderDoc.data();
+      console.log("Sender data retrieved:", {
+        exists: senderDoc.exists(),
+        data: senderData,
+      });
 
       if (!senderDoc.exists()) {
         throw new Error("Sender user not found");
       }
 
       // Get receiver's data
+      console.log("Getting receiver's data...");
       const receiverDoc = await getDoc(doc(db, "users", receiverId));
+      const receiverData = receiverDoc.data();
+      console.log("Receiver data retrieved:", {
+        exists: receiverDoc.exists(),
+        data: receiverData,
+      });
+
       if (!receiverDoc.exists()) {
         throw new Error("Receiver user not found");
       }
 
-      const receiverData = receiverDoc.data();
       const receiverDisplayName =
         receiverData?.username || receiverData?.displayName || "User";
 
       // Generate request ID
       const requestId = `fr_${senderId}_${receiverId}_${Date.now()}`;
+      console.log("Generated request ID:", requestId);
 
       const timestamp = Timestamp.now();
 
@@ -82,6 +129,7 @@ export const friendService = {
         receiverId,
         status: FriendRequestStatus.PENDING,
         createdAt: timestamp,
+        updatedAt: timestamp,
         senderDisplayName:
           senderData?.username || senderData?.displayName || senderDisplayName,
         senderPhotoURL: senderData?.photoURL || senderPhotoURL || null,
@@ -104,11 +152,20 @@ export const friendService = {
         responded: false,
       };
 
+      console.log("Preparing batch write with data:", {
+        requestData,
+        notificationData,
+      });
+
       // Use a batch write for atomicity
       const batch = writeBatch(db);
 
       // Add friend request document
       const friendRequestRef = doc(db, "friendRequests", requestId);
+      console.log(
+        "Creating friend request document at path:",
+        friendRequestRef.path
+      );
       batch.set(friendRequestRef, requestData);
 
       // Add notification document
@@ -116,11 +173,18 @@ export const friendService = {
         db,
         `users/${receiverId}/notifications/${requestId}`
       );
+      console.log(
+        "Creating notification document at path:",
+        notificationRef.path
+      );
       batch.set(notificationRef, notificationData);
 
       // Commit the batch
+      console.log("Committing batch...");
       await batch.commit();
+      console.log("Batch committed successfully");
     } catch (error) {
+      console.error("Error sending friend request:", error);
       if (error instanceof Error) {
         throw error;
       }

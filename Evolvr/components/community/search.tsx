@@ -101,10 +101,11 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
       const searchTerm = searchQuery.toLowerCase();
 
       if (type === "users") {
-        // Create a compound query for better search results
+        // Create a query using only usernameLower since we have an index for it
         const usersQuery = query(
           collection(db, "users"),
-          where("searchTerms", "array-contains", searchTerm),
+          where("usernameLower", ">=", searchTerm),
+          where("usernameLower", "<=", searchTerm + "\uf8ff"),
           orderBy("usernameLower"),
           limit(resultLimit)
         );
@@ -159,7 +160,7 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
             },
             habits: data.habits || {},
             posts: data.posts || [],
-            ...data, // Include any additional fields
+            ...data,
           } as UserData;
         });
 
@@ -277,9 +278,15 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
         setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1] || null);
         setHasMore(querySnapshot.docs.length === resultLimit);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Search error:", error);
-      setError("Failed to perform search. Please try again.");
+      if (error.code === "permission-denied") {
+        setError(
+          "You don't have permission to perform this search. Please check your authentication status."
+        );
+      } else {
+        setError("Failed to perform search. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -307,17 +314,17 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
                 <Text style={[styles.userName, { color: colors.textPrimary }]}>
                   {item.username || item.displayName || "Anonymous"}
                 </Text>
-                {item.bio && (
+                {item.bio ? (
                   <Text
                     style={[styles.userBio, { color: colors.textSecondary }]}
                     numberOfLines={2}
                   >
                     {item.bio}
                   </Text>
-                )}
+                ) : null}
               </View>
             </View>
-            {user && item.id !== user.uid && (
+            {user && item.id !== user.uid ? (
               <AddFriendBtn
                 targetUserId={item.id}
                 targetUserDisplayName={
@@ -326,7 +333,7 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
                 targetUserPhotoURL={item.photoURL}
                 variant="small"
               />
-            )}
+            ) : null}
           </TouchableOpacity>
         );
 
@@ -352,28 +359,28 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
               </Text>
             </View>
 
-            {item.title && (
+            {item.title ? (
               <Text style={[styles.postTitle, { color: colors.textPrimary }]}>
                 {item.title}
               </Text>
-            )}
+            ) : null}
 
-            {item.imageURL && (
+            {item.imageURL ? (
               <Image
                 source={{ uri: item.imageURL }}
                 style={styles.postImage}
                 resizeMode="cover"
               />
-            )}
+            ) : null}
 
-            {item.description && (
+            {item.description ? (
               <Text
                 style={[styles.postDescription, { color: colors.textPrimary }]}
                 numberOfLines={2}
               >
                 {item.description}
               </Text>
-            )}
+            ) : null}
 
             <View
               style={[
@@ -412,15 +419,17 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
                   size={20}
                   color={colors.textSecondary}
                 />
-                <Text
-                  style={[styles.actionText, { color: colors.textSecondary }]}
-                >
-                  {item.comments?.length || 0}
-                </Text>
+                {item.comments?.length > 0 ? (
+                  <Text
+                    style={[styles.actionText, { color: colors.textSecondary }]}
+                  >
+                    {item.comments.length}
+                  </Text>
+                ) : null}
               </TouchableOpacity>
             </View>
 
-            {item.hashtags?.length > 0 && (
+            {item.hashtags?.length > 0 ? (
               <View style={styles.hashtagContainer}>
                 {item.hashtags.map((tag: string, index: number) => (
                   <Text
@@ -431,7 +440,7 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
                   </Text>
                 ))}
               </View>
-            )}
+            ) : null}
           </View>
         );
 
@@ -443,12 +452,20 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
               { backgroundColor: colors.surfaceContainerHigh },
             ]}
           >
-            <Text style={styles.itemTitle}>{item.title}</Text>
-            {item.description && (
-              <Text numberOfLines={2} style={styles.itemDescription}>
+            <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+              {item.title}
+            </Text>
+            {item.description ? (
+              <Text
+                numberOfLines={2}
+                style={[
+                  styles.itemDescription,
+                  { color: colors.textSecondary },
+                ]}
+              >
                 {item.description}
               </Text>
-            )}
+            ) : null}
           </TouchableOpacity>
         );
     }
@@ -504,11 +521,19 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
         ) : null}
       </View>
 
-      {loading && results.length === 0 && (
-        <ActivityIndicator style={styles.loader} color={colors.secondary} />
-      )}
+      {loading && results.length === 0 ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator style={styles.loader} color={colors.secondary} />
+        </View>
+      ) : null}
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error ? (
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            {error}
+          </Text>
+        </View>
+      ) : null}
 
       <FlatList
         data={results}
@@ -531,14 +556,21 @@ export default function Search({ type, limit: resultLimit = 10 }: SearchProps) {
         style={{ backgroundColor: colors.background }}
         ListEmptyComponent={
           searchQuery.length >= 2 && !loading ? (
-            <Text style={[styles.noResults, { color: colors.textSecondary }]}>
-              No results found
-            </Text>
+            <View style={styles.noResultsContainer}>
+              <Text style={[styles.noResults, { color: colors.textSecondary }]}>
+                No results found
+              </Text>
+            </View>
           ) : null
         }
         ListFooterComponent={
           loading && results.length > 0 ? (
-            <ActivityIndicator style={styles.loader} color={colors.secondary} />
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator
+                style={styles.loader}
+                color={colors.secondary}
+              />
+            </View>
           ) : null
         }
       />
@@ -714,5 +746,20 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     flexGrow: 1,
+  },
+  loaderContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  errorContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noResultsContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
